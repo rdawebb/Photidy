@@ -1,0 +1,4 @@
+exifread==3.0.1
+numpy==1.24.3
+reverse-geocoder==1.5.1
+scipy==1.10.1
