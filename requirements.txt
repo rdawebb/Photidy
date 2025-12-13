@@ -1,5 +1,0 @@
-exifread==3.0.1
-numpy==2.3.5
-pytest==9.0.2
-reverse-geocoder==1.5.1
-scipy==1.10.1

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "photidy"
+version = "0.1.0"
+description = "A simple photo organisation tool"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "Rob Webb", email = "rdawebb@gmail.com"}
+]
+dependencies = [
+    "exifread==3.5.1",
+    "numpy==2.3.5",
+    "reverse-geocoder==1.5.1",
+    "scipy==1.16.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.2",
+    "pytest-cov==7.0.0",
+]
