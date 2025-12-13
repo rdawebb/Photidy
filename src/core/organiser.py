@@ -1,5 +1,6 @@
 """Organiser module for organising photos based on metadata."""
 
+import os
 import shutil
 from pathlib import Path
 
@@ -108,7 +109,7 @@ def _validate_directories(source, dest):
         raise InvalidDirectoryError(f"Source directory does not exist: {source}")
     if not source.is_dir():
         raise InvalidDirectoryError(f"Source path is not a directory: {source}")
-    if not source.is_readable():
+    if not os.access(source, os.R_OK):
         raise InvalidDirectoryError(f"Source directory is not readable: {source}")
 
     try:

@@ -22,9 +22,9 @@ def get_image_info(file_path):
         dict: A dictionary containing date taken and location string.
     """
     metadata = _get_image_metadata(file_path)
-    date_taken = _get_date_taken(metadata)
-    location = _get_location(metadata)
-    location_string = _convert_to_location_string(location)
+    date_taken = _get_date_taken(metadata, file_path)
+    location = _get_location(metadata, file_path)
+    location_string = _convert_to_location_string(location, file_path)
     return {"date_taken": date_taken, "location": location_string}
 
 
