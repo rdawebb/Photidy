@@ -88,3 +88,93 @@ pub fn extract_exif(path: &str) -> ExifData {
 
     ExifData { timestamp, lat, lon }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ============ Unit tests for parse_datetime ============
+
+    #[test]
+    fn test_parse_datetime_valid_format() {
+        let result = parse_datetime("2024:06:15 14:30:45");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2024);
+        assert_eq!(dt.month(), 6);
+        assert_eq!(dt.day(), 15);
+        assert_eq!(dt.hour(), 14);
+        assert_eq!(dt.minute(), 30);
+        assert_eq!(dt.second(), 45);
+    }
+
+    #[test]
+    fn test_parse_datetime_invalid_format() {
+        let result = parse_datetime("15-06-2024 14:30:45");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_datetime_invalid_date() {
+        let result = parse_datetime("2024:13:32 25:61:61");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_datetime_returns_utc() {
+        let result = parse_datetime("2024:06:15 14:30:45");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.timezone(), chrono::Utc);
+    }
+
+    #[test]
+    fn test_parse_datetime_leap_year() {
+        let result = parse_datetime("2024:02:29 12:00:00");
+        assert!(result.is_some()); // 2024 is a leap year
+    }
+
+    #[test]
+    fn test_parse_datetime_invalid_leap_day() {
+        let result = parse_datetime("2023:02:29 12:00:00");
+        assert!(result.is_none()); // 2023 is not a leap year
+    }
+
+    #[test]
+    fn test_parse_datetime_midnight() {
+        let result = parse_datetime("2024:06:15 00:00:00");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.hour(), 0);
+        assert_eq!(dt.minute(), 0);
+        assert_eq!(dt.second(), 0);
+    }
+
+    #[test]
+    fn test_parse_datetime_end_of_day() {
+        let result = parse_datetime("2024:06:15 23:59:59");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.hour(), 23);
+        assert_eq!(dt.minute(), 59);
+        assert_eq!(dt.second(), 59);
+    }
+
+    // ============ Unit tests for extract_exif error handling ============
+
+    #[test]
+    fn test_extract_exif_from_nonexistent_file() {
+        let exif_data = extract_exif("/nonexistent/path/file.jpg");
+        assert!(exif_data.timestamp.is_none());
+        assert!(exif_data.lat.is_none());
+        assert!(exif_data.lon.is_none());
+    }
+
+    #[test]
+    fn test_extract_exif_from_invalid_image_file() {
+        let result = extract_exif("tests/fixtures/not_an_image.txt");
+        assert!(result.timestamp.is_none());
+        assert!(result.lat.is_none());
+        assert!(result.lon.is_none());
+    }
+}
