@@ -22,4 +22,5 @@ dependencies = [
 dev = [
     "pytest==9.0.2",
     "pytest-cov==7.0.0",
+    "icecream==2.1.8"
 ]
