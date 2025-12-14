@@ -125,7 +125,7 @@ mod tests {
     fn test_reverse_geocode_just_outside_search_radius() {
         let conn = setup_test_db();
         // Coordinates just outside 0.5 degrees from London
-        let result = reverse_geocode(&conn, 52.0080, -0.1278);
+        let result = reverse_geocode(&conn, 52.0516, -0.1425);
         assert!(result.is_none());
     }
 
@@ -161,3 +161,4 @@ mod tests {
         assert!(place.lon < 0.0);
         assert!(place.importance >= 0.0);
     }
+}

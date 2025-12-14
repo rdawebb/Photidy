@@ -30,22 +30,22 @@ install:
 build-rust:
 	cd rust/photo_meta && maturin develop
 
-test-rust-unit: build-rust
+test-rust-unit:
 	@echo "Running Rust unit tests..."
 	cd rust/photo_meta && cargo test --lib
 	@echo ""
 
-test-rust-integration: build-rust
+test-rust-integration:
 	@echo "Running Rust integration tests..."
 	cd rust/photo_meta && cargo test --test '*'
 	@echo ""
 
-test-rust: build-rust
+test-rust:
 	@echo "Running all Rust tests (unit + integration)..."
 	cd rust/photo_meta && cargo test
 	@echo ""
 
-test: test-rust
+test: build-rust test-rust
 	@echo "Running Python tests..."
 	uv run pytest -v
 	@echo ""

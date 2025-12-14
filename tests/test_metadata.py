@@ -187,3 +187,98 @@ class TestGetImageInfo:
         with patch("src.core.metadata.extract_metadata", return_value=expected_result):
             result = get_image_info("test.jpg")
             assert result == expected_result
+
+
+class TestRustExtractMetadataIntegration:
+    """Integration tests for the Rust extract_metadata function.
+
+    These tests verify the output format and correctness of the Rust metadata extraction.
+    """
+
+    def test_extract_metadata_with_complete_exif(self):
+        """Test extract_metadata with complete EXIF data (date and location)."""
+        from photo_meta import extract_metadata
+
+        result = extract_metadata("rust/photo_meta/tests/fixtures/complete_exif.jpg")
+
+        # Verify all required keys exist
+        assert "date_taken" in result
+        assert "lat" in result
+        assert "lon" in result
+        assert "location" in result
+
+        # Verify date_taken is valid RFC3339
+        if result["date_taken"] is not None:
+            # Should be parseable as ISO format datetime
+            from datetime import datetime
+
+            datetime.fromisoformat(result["date_taken"].replace("Z", "+00:00"))
+
+        # Verify lat/lon are valid floats in correct range
+        if result["lat"] is not None and result["lon"] is not None:
+            assert isinstance(result["lat"], float)
+            assert isinstance(result["lon"], float)
+            assert -90.0 <= result["lat"] <= 90.0
+            assert -180.0 <= result["lon"] <= 180.0
+
+            # Verify location has proper structure or "Unknown location"
+            location = result["location"]
+            if location != "Unknown location":
+                parts = [p.strip() for p in location.split(",")]
+                assert len(parts) in (2, 3), (
+                    f"Location should have 2-3 parts, got {len(parts)}: {location}"
+                )
+                for part in parts:
+                    assert len(part) > 0, "Location parts should not be empty"
+
+    def test_extract_metadata_without_exif(self):
+        """Test extract_metadata with an image that has no EXIF data."""
+        from photo_meta import extract_metadata
+
+        result = extract_metadata("rust/photo_meta/tests/fixtures/no_exif.jpg")
+
+        # Should have all keys but with None/default values for missing EXIF
+        assert "date_taken" in result
+        assert "lat" in result
+        assert "lon" in result
+        assert "location" in result
+
+        # No date or GPS data
+        assert result["date_taken"] is None
+        assert result["lat"] is None
+        assert result["lon"] is None
+        assert result["location"] == "Unknown location"
+
+    def test_extract_metadata_with_gps_only(self):
+        """Test extract_metadata with GPS data but no date."""
+        from photo_meta import extract_metadata
+
+        result = extract_metadata("rust/photo_meta/tests/fixtures/only_gps.jpg")
+
+        # Should have GPS but no date
+        assert result["date_taken"] is None
+        assert result["lat"] is not None
+        assert result["lon"] is not None
+
+        # Verify GPS coordinates are valid
+        assert isinstance(result["lat"], float)
+        assert isinstance(result["lon"], float)
+        assert -90.0 <= result["lat"] <= 90.0
+        assert -180.0 <= result["lon"] <= 180.0
+
+    def test_extract_metadata_with_date_only(self):
+        """Test extract_metadata with date but no GPS data."""
+        from photo_meta import extract_metadata
+
+        result = extract_metadata("rust/photo_meta/tests/fixtures/only_date.jpg")
+
+        # Should have date but no GPS
+        assert result["date_taken"] is not None
+        assert result["lat"] is None
+        assert result["lon"] is None
+        assert result["location"] == "Unknown location"
+
+        # Verify date format is valid RFC3339
+        from datetime import datetime
+
+        datetime.fromisoformat(result["date_taken"].replace("Z", "+00:00"))

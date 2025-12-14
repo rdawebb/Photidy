@@ -59,6 +59,6 @@ mod tests {
     #[test]
     fn test_antimeridian_crossing() {
         let distance = haversine(0.0, 179.9, 0.0, -179.9);
-        assert!(distance < 20.0); // Should be approx 22 km
+        assert!(distance < 23.0); // Should be approx 22 km
     }
 }

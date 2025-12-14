@@ -37,8 +37,13 @@ pub fn parse_gps_coordinate(field: &exif::Field) -> Option<f64> {
 }
 
 pub fn parse_datetime(datetime_str: &str) -> Option<DateTime<chrono::Utc>> {
-    NaiveDateTime::parse_from_str(datetime_str, "%Y:%m:%d %H:%M:%S")
+    // Try parsing with hyphens first (which is what exif::display_value() returns)
+    NaiveDateTime::parse_from_str(datetime_str, "%Y-%m-%d %H:%M:%S")
         .ok()
+        .or_else(|| {
+            // Fall back to colon format for raw EXIF values
+            NaiveDateTime::parse_from_str(datetime_str, "%Y:%m:%d %H:%M:%S").ok()
+        })
         .map(|dt| DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc))
 }
 
@@ -92,8 +97,7 @@ pub fn extract_exif(path: &str) -> ExifData {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ============ Unit tests for parse_datetime ============
+    use chrono::{Datelike, Timelike};
 
     #[test]
     fn test_parse_datetime_valid_format() {
@@ -160,8 +164,6 @@ mod tests {
         assert_eq!(dt.second(), 59);
     }
 
-    // ============ Unit tests for extract_exif error handling ============
-
     #[test]
     fn test_extract_exif_from_nonexistent_file() {
         let exif_data = extract_exif("/nonexistent/path/file.jpg");
@@ -172,8 +174,47 @@ mod tests {
 
     #[test]
     fn test_extract_exif_from_invalid_image_file() {
-        let result = extract_exif("tests/fixtures/not_an_image.txt");
+        let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/not_an_image.txt");
+        let result = extract_exif(fixture_path);
         assert!(result.timestamp.is_none());
+        assert!(result.lat.is_none());
+        assert!(result.lon.is_none());
+    }
+
+    #[test]
+    fn test_extract_exif_from_image_without_exif() {
+        let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/no_exif.jpg");
+        let result = extract_exif(fixture_path);
+        assert!(result.timestamp.is_none());
+        assert!(result.lat.is_none());
+        assert!(result.lon.is_none());
+    }
+
+    #[test]
+    fn test_extract_exif_with_complete_data() {
+        let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/complete_exif.jpg");
+        let result = extract_exif(fixture_path);
+        assert!(result.timestamp.is_some());
+        assert!(result.lat.is_some());
+        assert!(result.lon.is_some());
+        assert!(result.lat.unwrap() >= -90.0 && result.lat.unwrap() <= 90.0);
+        assert!(result.lon.unwrap() >= -180.0 && result.lon.unwrap() <= 180.0);
+    }
+
+    #[test]
+    fn test_extract_exif_with_only_gps_no_date() {
+        let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/only_gps.jpg");
+        let result = extract_exif(fixture_path);
+        assert!(result.timestamp.is_none());
+        assert!(result.lat.is_some());
+        assert!(result.lon.is_some());
+    }
+
+    #[test]
+    fn test_extract_exif_with_only_date_no_gps() {
+        let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/only_date.jpg");
+        let result = extract_exif(fixture_path);
+        assert!(result.timestamp.is_some());
         assert!(result.lat.is_none());
         assert!(result.lon.is_none());
     }
