@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 
 pub mod exif;
+pub mod gps;
 mod geocode;
 mod haversine;
 pub mod models;
