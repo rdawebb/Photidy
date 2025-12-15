@@ -29,3 +29,21 @@ class InvalidDirectoryError(PhotidyError):
     """Raised when a specified directory is invalid or inaccessible."""
 
     pass
+
+
+class DatabaseError(PhotidyError):
+    """Raised when there is a database-related error."""
+
+    pass
+
+
+class DataSourceError(PhotidyError):
+    """Raised when there is an error with the data source."""
+
+    pass
+
+
+class CSVParsingError(PhotidyError):
+    """Raised when there is an error parsing a CSV file."""
+
+    pass

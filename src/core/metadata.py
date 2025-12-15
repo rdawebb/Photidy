@@ -9,7 +9,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def get_image_info(file_path):
+def get_image_info(file_path) -> dict:
     """Extract metadata from an image file via Rust bridge
 
     Args:

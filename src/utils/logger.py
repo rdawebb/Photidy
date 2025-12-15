@@ -40,7 +40,7 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-def configure_logging(level=logging.INFO):
+def configure_logging(level=logging.INFO) -> None:
     """Configure the root logger.
 
     Args:

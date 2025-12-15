@@ -17,7 +17,7 @@ from .metadata import get_image_info
 logger = get_logger(__name__)
 
 
-def organise_photos(source_dir, dest_dir):
+def organise_photos(source_dir, dest_dir) -> dict:
     """Organise photos from source directory to destination directory based on metadata.
 
     Args:
@@ -95,7 +95,7 @@ def organise_photos(source_dir, dest_dir):
     return summary
 
 
-def _validate_directories(source, dest):
+def _validate_directories(source, dest) -> None:
     """Validate source and destination directories.
 
     Args:
@@ -122,7 +122,7 @@ def _validate_directories(source, dest):
     logger.debug(f"Validated directories - source: {source}, destination: {dest}")
 
 
-def _get_unique_filename(directory, filename):
+def _get_unique_filename(directory, filename) -> str:
     """Generate a unique filename in the specified directory.
 
     Args:
