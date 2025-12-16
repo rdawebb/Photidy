@@ -2,18 +2,15 @@ use pyo3::prelude::*;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use rusqlite::Connection;
+use crate::db::get_db;
 
+mod compat;
+mod db;
 pub mod exif;
 pub mod gps;
 mod geocode;
 mod haversine;
 pub mod models;
-
-// Wrap Connection in Mutex for thread-safe access
-static DB: Lazy<Mutex<Connection>> = Lazy::new(|| {
-    let conn = Connection::open("places.db").expect("Failed to open DB");
-    Mutex::new(conn)
-});
 
 #[pyfunction]
 fn extract_metadata(path: &str) -> PyResult<Py<pyo3::types::PyDict>> {
@@ -41,7 +38,7 @@ fn extract_metadata(path: &str) -> PyResult<Py<pyo3::types::PyDict>> {
         }
 
         if let (Some(lat), Some(lon)) = (exif_data.lat, exif_data.lon) {
-            let db = DB.lock().unwrap();
+            let db = get_db();
             let location_string = geocode::reverse_geocode(&db, lat, lon)
                 .map(|place| {
                     match place.admin {
