@@ -14,11 +14,19 @@ pub fn db_filename() -> &'static str {
     "places_v1.0.db"
 }
 
+pub fn validate_db(path: &Path) -> Result<(), DbError> {
+    let conn = Connection::open(path)
+        .map_err(DbError::Open)?;
+    
+    compat::assert_compatible(&conn)
+        .map_err(DbError::Incompatible)?;
+}
+
 pub fn get_db(path: &Path) -> Result<&'static Connection, DbError> {
     DB_CONN.get_or_try_init(|| {
         let conn = Connection::open(path)
             .map_err(DbError::Open)?;
-        
+
         compat::assert_compatible(&conn)
             .map_err(DbError::Incompatible)?;
 
