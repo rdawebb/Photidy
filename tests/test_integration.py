@@ -12,7 +12,7 @@ from src.utils.errors import InvalidDirectoryError
 class TestPhotidyIntegration:
     """Integration tests for end-to-end workflows."""
 
-    def test_end_to_end_photo_organization_workflow(
+    def test_end_to_end_photo_organisation_workflow(
         self, valid_source_dir, valid_dest_dir, suppress_logging
     ):
         """Test complete workflow from source to organized destination."""
@@ -169,7 +169,7 @@ class TestPhotidyIntegration:
         with pytest.raises(InvalidDirectoryError):
             organise_photos(str(valid_source_dir), str(bad_dest))
 
-    def test_large_batch_photo_organization(
+    def test_large_batch_photo_organisation(
         self, valid_source_dir, valid_dest_dir, suppress_logging
     ):
         """Test organizing a large batch of photos."""
@@ -206,7 +206,7 @@ class TestPhotidyIntegration:
         # Verify source is empty
         assert len(list(valid_source_dir.glob("*"))) == 0
 
-    def test_organization_with_duplicate_filenames(
+    def test_organisation_with_duplicate_filenames(
         self, valid_source_dir, valid_dest_dir, suppress_logging
     ):
         """Test organizing photos with duplicate filenames but different content."""

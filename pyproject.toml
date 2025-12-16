@@ -12,11 +12,7 @@ authors = [
     {name = "Rob Webb", email = "rdawebb@gmail.com"}
 ]
 dependencies = [
-    "exifread==3.5.1",
-    "numpy==2.3.5",
-    "platformdirs==4.5.1"
-    "reverse-geocoder==1.5.1",
-    "scipy==1.16.3",
+    "platformdirs==4.5.1",
 ]
 
 [project.optional-dependencies]

@@ -12,6 +12,16 @@ from src.core.metadata import get_image_info
 from src.utils.errors import InvalidPhotoFormatError, PhotoMetadataError
 
 
+@pytest.fixture
+def db_path():
+    """Fixture that provides the embedded database path for tests."""
+    from pathlib import Path
+    import photo_meta
+
+    db_dir = Path(__file__).parent.parent / "rust/photo_meta/data"
+    return str(db_dir / photo_meta.db_filename())
+
+
 class TestGetImageInfo:
     """Integration tests for get_image_info wrapper function."""
 
@@ -195,11 +205,13 @@ class TestRustExtractMetadataIntegration:
     These tests verify the output format and correctness of the Rust metadata extraction.
     """
 
-    def test_extract_metadata_with_complete_exif(self):
+    def test_extract_metadata_with_complete_exif(self, db_path):
         """Test extract_metadata with complete EXIF data (date and location)."""
         from photo_meta import extract_metadata
 
-        result = extract_metadata("rust/photo_meta/tests/fixtures/complete_exif.jpg")
+        result = extract_metadata(
+            "rust/photo_meta/tests/fixtures/complete_exif.jpg", db_path
+        )
 
         # Verify all required keys exist
         assert "date_taken" in result
@@ -231,11 +243,11 @@ class TestRustExtractMetadataIntegration:
                 for part in parts:
                     assert len(part) > 0, "Location parts should not be empty"
 
-    def test_extract_metadata_without_exif(self):
+    def test_extract_metadata_without_exif(self, db_path):
         """Test extract_metadata with an image that has no EXIF data."""
         from photo_meta import extract_metadata
 
-        result = extract_metadata("rust/photo_meta/tests/fixtures/no_exif.jpg")
+        result = extract_metadata("rust/photo_meta/tests/fixtures/no_exif.jpg", db_path)
 
         # Should have all keys but with None/default values for missing EXIF
         assert "date_taken" in result
@@ -249,11 +261,13 @@ class TestRustExtractMetadataIntegration:
         assert result["lon"] is None
         assert result["location"] == "Unknown location"
 
-    def test_extract_metadata_with_gps_only(self):
+    def test_extract_metadata_with_gps_only(self, db_path):
         """Test extract_metadata with GPS data but no date."""
         from photo_meta import extract_metadata
 
-        result = extract_metadata("rust/photo_meta/tests/fixtures/only_gps.jpg")
+        result = extract_metadata(
+            "rust/photo_meta/tests/fixtures/only_gps.jpg", db_path
+        )
 
         # Should have GPS but no date
         assert result["date_taken"] is None
@@ -266,11 +280,13 @@ class TestRustExtractMetadataIntegration:
         assert -90.0 <= result["lat"] <= 90.0
         assert -180.0 <= result["lon"] <= 180.0
 
-    def test_extract_metadata_with_date_only(self):
+    def test_extract_metadata_with_date_only(self, db_path):
         """Test extract_metadata with date but no GPS data."""
         from photo_meta import extract_metadata
 
-        result = extract_metadata("rust/photo_meta/tests/fixtures/only_date.jpg")
+        result = extract_metadata(
+            "rust/photo_meta/tests/fixtures/only_date.jpg", db_path
+        )
 
         # Should have date but no GPS
         assert result["date_taken"] is not None

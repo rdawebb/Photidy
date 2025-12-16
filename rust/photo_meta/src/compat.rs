@@ -23,7 +23,7 @@ pub fn crate_version() -> Version {
 
 pub fn read_db_version(conn: &Connection) -> rusqlite::Result<Version> {
     let raw: String = conn.query_row(
-        "SELECT value FROM metadata WHERE key = 'db_version'",
+        "SELECT value FROM meta WHERE key = 'db_version'",
         [],
         |row| row.get(0),
     )?;

@@ -1,8 +1,5 @@
 use pyo3::prelude::*;
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
-use rusqlite::Connection;
-use crate::db::get_db;
+use crate::db::{get_db};
 
 mod compat;
 mod db;
@@ -13,10 +10,10 @@ mod haversine;
 pub mod models;
 
 #[pyfunction]
-fn extract_metadata(path: &str) -> PyResult<Py<pyo3::types::PyDict>> {
+fn extract_metadata(path: &str, db_path: &str) -> PyResult<Py<pyo3::types::PyDict>> {
     let exif_data = exif::extract_exif(path);
 
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let dict = pyo3::types::PyDict::new(py);
 
         if let Some(timestamp) = exif_data.timestamp {
@@ -38,7 +35,8 @@ fn extract_metadata(path: &str) -> PyResult<Py<pyo3::types::PyDict>> {
         }
 
         if let (Some(lat), Some(lon)) = (exif_data.lat, exif_data.lon) {
-            let db = get_db();
+            let db = get_db(std::path::Path::new(db_path))
+                .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Failed to open database"))?;
             let location_string = geocode::reverse_geocode(&db, lat, lon)
                 .map(|place| {
                     match place.admin {
@@ -57,8 +55,26 @@ fn extract_metadata(path: &str) -> PyResult<Py<pyo3::types::PyDict>> {
     })
 }
 
+#[pyfunction]
+fn db_filename() -> &'static str {
+    crate::db::db_filename()
+}
+
+#[pyfunction]
+fn validate_db(path: &str) -> PyResult<()> {
+    crate::db::validate_db(std::path::Path::new(path))
+        .map_err(|e| match e {
+            crate::db::DbError::Open(err) => 
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to open database: {}", err)),
+            crate::db::DbError::Incompatible(err) => 
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Database incompatible: {}", err)),
+        })
+}
+
 #[pymodule]
 fn photo_meta(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(extract_metadata, m)?)?;
+    m.add_function(wrap_pyfunction!(db_filename, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_db, m)?)?;
     Ok(())
 }
