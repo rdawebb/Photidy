@@ -1,13 +1,14 @@
 use pyo3::prelude::*;
-use crate::db::{get_db};
 
 mod compat;
 mod db;
+mod errors;
 pub mod exif;
 pub mod gps;
 mod geocode;
 mod haversine;
 pub mod models;
+mod scoring;
 
 #[pyfunction]
 fn extract_metadata(path: &str, db_path: &str) -> PyResult<Py<pyo3::types::PyDict>> {
@@ -35,9 +36,8 @@ fn extract_metadata(path: &str, db_path: &str) -> PyResult<Py<pyo3::types::PyDic
         }
 
         if let (Some(lat), Some(lon)) = (exif_data.lat, exif_data.lon) {
-            let db = get_db(std::path::Path::new(db_path))
-                .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Failed to open database"))?;
-            let location_string = geocode::reverse_geocode(&db, lat, lon)
+            let db_path = std::path::Path::new(db_path);
+            let location_string = geocode::reverse_geocode(db_path, lat, lon)
                 .map(|place| {
                     match place.admin {
                         Some(admin) => format!("{}, {}, {}", place.name, admin, place.country),
@@ -64,10 +64,12 @@ fn db_filename() -> &'static str {
 fn validate_db(path: &str) -> PyResult<()> {
     crate::db::validate_db(std::path::Path::new(path))
         .map_err(|e| match e {
-            crate::db::DbError::Open(err) => 
+            crate::errors::DbError::Open(err) => 
                 PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to open database: {}", err)),
-            crate::db::DbError::Incompatible(err) => 
+            crate::errors::DbError::Incompatible(err) => 
                 PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Database incompatible: {}", err)),
+            crate::errors::DbError::Query(err) => 
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Database query error: {}", err)),
         })
 }
 

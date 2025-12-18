@@ -2,16 +2,11 @@ use std::fs::File;
 use std::io::BufReader;
 use exif::{Reader, Tag, In};
 use chrono::{DateTime, NaiveDateTime};
-use crate::gps::extract_gps;
 
-pub struct ExifData {
-    pub timestamp: Option<DateTime<chrono::Utc>>,
-    pub lat: Option<f64>,
-    pub lon: Option<f64>,
-}
+use crate::gps::extract_gps;
+use crate::models::ExifData;
 
 pub fn parse_datetime(datetime_str: &str) -> Option<DateTime<chrono::Utc>> {
-    // Try standard EXIF format first
     NaiveDateTime::parse_from_str(datetime_str, "%Y-%m-%d %H:%M:%S")
         .ok()
         .or_else(|| {
