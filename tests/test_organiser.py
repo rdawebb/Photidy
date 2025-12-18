@@ -45,20 +45,13 @@ class TestValidateDirectories:
 
     def test_source_not_readable(self, temp_dir, suppress_logging):
         """Test that unreadable source directory raises InvalidDirectoryError."""
-        import os
-
-        source = temp_dir / "source"
-        source.mkdir()
-        dest = temp_dir / "dest"
-        dest.mkdir()
-        # Remove read permissions from source
-        os.chmod(source, 0o000)
-        try:
+        with patch("os.access", return_value=False):
+            source = temp_dir / "source"
+            source.mkdir()
+            dest = temp_dir / "dest"
+            dest.mkdir()
             with pytest.raises(InvalidDirectoryError):
                 _validate_directories(source, dest)
-        finally:
-            # Restore permissions for cleanup
-            os.chmod(source, 0o755)
 
     def test_destination_directory_creation_failure(
         self, valid_source_dir, temp_dir, suppress_logging

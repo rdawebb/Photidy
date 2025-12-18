@@ -173,11 +173,13 @@ class TestPhotidyIntegration:
         self, valid_source_dir, valid_dest_dir, suppress_logging
     ):
         """Test organizing a large batch of photos."""
+        from pathlib import Path
+
         for i in range(20):
             (valid_source_dir / f"photo_{i}.jpg").write_text("fake image")
 
         def mock_get_image_info(path):
-            filename = path.split("/")[-1]  # Get just the filename
+            filename = Path(path).name  # Get just the filename
             photo_num = int(filename.split("_")[1].split(".")[0])
             dates = [
                 datetime(2024, 1, 15),
