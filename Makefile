@@ -6,6 +6,7 @@ help:
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install              Install Python dependencies"
+	@echo "  make install-dev          Install development dependencies"
 	@echo "  make build-rust           Build and install Rust module"
 	@echo ""
 	@echo "Testing:"
@@ -24,6 +25,9 @@ help:
 
 install:
 	uv sync
+
+install-dev:
+	uv sync --all-extras
 
 build-rust:
 	uv run python scripts/build_rust.py
