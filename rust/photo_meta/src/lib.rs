@@ -44,11 +44,11 @@ fn extract_metadata(path: &str, db_path: &str) -> PyResult<Py<pyo3::types::PyDic
                         None => format!("{}, {}", place.name, place.country),
                     }
                 })
-                .unwrap_or_else(|| "Unknown location".to_string());
-            
+                .unwrap_or_else(|| "Unknown Location".to_string());
+
             dict.set_item("location", location_string)?;
         } else {
-            dict.set_item("location", "Unknown location")?;
+            dict.set_item("location", "Unknown Location")?;
         }
 
         Ok(dict.into())

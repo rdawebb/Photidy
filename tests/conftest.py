@@ -1,6 +1,7 @@
 """Pytest configuration and shared fixtures."""
 
 import logging
+from datetime import datetime
 from unittest.mock import Mock
 
 import pytest
@@ -85,3 +86,90 @@ def suppress_logging():
     logging.getLogger("src.core.metadata").setLevel(logging.DEBUG)
     logging.getLogger("src.core.organiser").setLevel(logging.DEBUG)
     logging.getLogger("src.utils.logger").setLevel(logging.DEBUG)
+
+
+@pytest.fixture
+def mock_rust():
+    """Create a configurable mock Rust object."""
+    rust = Mock()
+    rust.db_filename.return_value = "test.db"
+    rust.validate_db.return_value = True
+    return rust
+
+
+@pytest.fixture
+def metadata_scenarios():
+    """Fixture providing metadata results for different scenarios."""
+    return {
+        "complete": {
+            "date_taken": "2024-01-15T14:30:45+00:00",
+            "lat": 40.5,
+            "lon": -74.0,
+            "location": "New York, New York, US",
+        },
+        "date_only": {
+            "date_taken": "2024-01-15T14:30:45+00:00",
+            "lat": None,
+            "lon": None,
+            "location": "Unknown Location",
+        },
+        "location_only": {
+            "date_taken": None,
+            "lat": 40.5,
+            "lon": -74.0,
+            "location": "New York, New York, US",
+        },
+        "no_exif": {
+            "date_taken": None,
+            "lat": None,
+            "lon": None,
+            "location": "Unknown Location",
+        },
+    }
+
+
+@pytest.fixture
+def mock_image_info_complete():
+    """Fixture providing complete image info for testing."""
+    return {
+        "date_taken": datetime(2024, 1, 15, 14, 30, 45),
+        "location": "New York, New York, US",
+    }
+
+
+@pytest.fixture
+def supported_image_formats():
+    """List of supported image formats."""
+    return (".jpg", ".jpeg", ".png", ".tiff", ".raw", ".cr2", ".heic")
+
+
+@pytest.fixture
+def logging_levels():
+    """Dictionary of standard logging levels."""
+    return {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
+
+
+@pytest.fixture
+def error_classes_data():
+    """Fixture providing error class test data."""
+    from src.utils.errors import (
+        InvalidDirectoryError,
+        InvalidPhotoFormatError,
+        PhotoMetadataError,
+        PhotoOrganisationError,
+        PhotidyError,
+    )
+
+    return [
+        (PhotidyError, Exception, "Test error message"),
+        (PhotoOrganisationError, PhotidyError, "Organisation failed"),
+        (PhotoMetadataError, PhotidyError, "Metadata extraction failed"),
+        (InvalidPhotoFormatError, PhotidyError, "Unsupported format"),
+        (InvalidDirectoryError, PhotidyError, "Directory not found"),
+    ]

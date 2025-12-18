@@ -26,48 +26,36 @@ class TestValidateDirectories:
         """Test validation with valid source and destination directories."""
         _validate_directories(valid_source_dir, valid_dest_dir)
 
-    def test_source_directory_does_not_exist(self, temp_dir, suppress_logging):
-        """Test that non-existent source directory raises InvalidDirectoryError."""
-        source = temp_dir / "nonexistent"
+    @pytest.mark.parametrize(
+        "error_scenario",
+        ["nonexistent", "not_directory", "not_readable"],
+        ids=["missing", "is_file", "no_access"],
+    )
+    def test_source_validation_errors(self, temp_dir, suppress_logging, error_scenario):
+        """Test various source directory validation errors."""
+        source = temp_dir / "source"
         dest = temp_dir / "dest"
         dest.mkdir()
-        with pytest.raises(InvalidDirectoryError):
-            _validate_directories(source, dest)
 
-    def test_source_is_not_directory(self, temp_dir, suppress_logging):
-        """Test that file source raises InvalidDirectoryError."""
-        source = temp_dir / "file.txt"
-        source.write_text("test")
-        dest = temp_dir / "dest"
-        dest.mkdir()
-        with pytest.raises(InvalidDirectoryError):
-            _validate_directories(source, dest)
-
-    def test_source_not_readable(self, temp_dir, suppress_logging):
-        """Test that unreadable source directory raises InvalidDirectoryError."""
-        with patch("os.access", return_value=False):
-            source = temp_dir / "source"
+        if error_scenario == "nonexistent":
+            # Source doesn't exist - don't create it
+            pass
+        elif error_scenario == "not_directory":
+            source.write_text("not a directory")
+        elif error_scenario == "not_readable":
             source.mkdir()
-            dest = temp_dir / "dest"
-            dest.mkdir()
-            with pytest.raises(InvalidDirectoryError):
-                _validate_directories(source, dest)
+            with patch("os.access", return_value=False):
+                with pytest.raises(InvalidDirectoryError):
+                    _validate_directories(source, dest)
+                return
+
+        with pytest.raises(InvalidDirectoryError):
+            _validate_directories(source, dest)
 
     def test_destination_directory_creation_failure(
         self, valid_source_dir, temp_dir, suppress_logging
     ):
         """Test that destination creation failure raises InvalidDirectoryError."""
-        source = valid_source_dir
-        dest = temp_dir / "dest"
-
-        (temp_dir / "dest").write_text("this is a file, not a directory")
-        with pytest.raises(InvalidDirectoryError):
-            _validate_directories(source, dest)
-
-    def test_destination_directory_permission_error(
-        self, valid_source_dir, temp_dir, suppress_logging
-    ):
-        """Test that destination permission error raises InvalidDirectoryError."""
         source = valid_source_dir
         dest = temp_dir / "dest"
 
@@ -89,48 +77,38 @@ class TestValidateDirectories:
 class TestGetUniqueFilename:
     """Test _get_unique_filename function."""
 
-    def test_file_does_not_exist(self, temp_dir, suppress_logging):
-        """Test that original filename is returned if file doesn't exist."""
+    @pytest.mark.parametrize(
+        "existing_files,filename,expected",
+        [
+            ([], "photo.jpg", "photo.jpg"),
+            (["photo.jpg"], "photo.jpg", "photo_1.jpg"),
+            (
+                ["photo.jpg", "photo_1.jpg", "photo_2.jpg"],
+                "photo.jpg",
+                "photo_3.jpg",
+            ),
+            (["image.png"], "image.png", "image_1.png"),
+            (["photo.backup.jpg"], "photo.backup.jpg", "photo.backup_1.jpg"),
+        ],
+        ids=[
+            "no_conflict",
+            "one_conflict",
+            "multiple_conflicts",
+            "different_ext",
+            "multiple_dots",
+        ],
+    )
+    def test_unique_filename_generation(
+        self, temp_dir, suppress_logging, existing_files, filename, expected
+    ):
+        """Test unique filename generation with various conflict scenarios."""
         directory = temp_dir / "dir"
         directory.mkdir()
-        result = _get_unique_filename(directory, "photo.jpg")
-        assert result == "photo.jpg"
+        for f in existing_files:
+            (directory / f).write_text("test")
 
-    def test_file_exists_generates_counter(self, temp_dir, suppress_logging):
-        """Test that counter is added when file exists."""
-        directory = temp_dir / "dir"
-        directory.mkdir()
-
-        (directory / "photo.jpg").write_text("test")
-        result = _get_unique_filename(directory, "photo.jpg")
-        assert result == "photo_1.jpg"
-
-    def test_multiple_conflicts_finds_next_counter(self, temp_dir, suppress_logging):
-        """Test finding next available counter with multiple conflicts."""
-        directory = temp_dir / "dir"
-        directory.mkdir()
-
-        (directory / "photo.jpg").write_text("test")
-        (directory / "photo_1.jpg").write_text("test")
-        (directory / "photo_2.jpg").write_text("test")
-        result = _get_unique_filename(directory, "photo.jpg")
-        assert result == "photo_3.jpg"
-
-    def test_unique_filename_with_different_extension(self, temp_dir, suppress_logging):
-        """Test unique filename generation with different extensions."""
-        directory = temp_dir / "dir"
-        directory.mkdir()
-        (directory / "image.png").write_text("test")
-        result = _get_unique_filename(directory, "image.png")
-        assert result == "image_1.png"
-
-    def test_unique_filename_with_multiple_dots(self, temp_dir, suppress_logging):
-        """Test unique filename with multiple dots in name."""
-        directory = temp_dir / "dir"
-        directory.mkdir()
-        (directory / "photo.backup.jpg").write_text("test")
-        result = _get_unique_filename(directory, "photo.backup.jpg")
-        assert result == "photo.backup_1.jpg"
+        result = _get_unique_filename(directory, filename)
+        assert result == expected
 
     def test_exception_during_filename_generation(self, temp_dir, suppress_logging):
         """Test that exception during filename generation raises PhotoOrganisationError."""

@@ -3,6 +3,8 @@
 import logging
 from pathlib import Path
 
+import pytest
+
 from src.utils.logger import configure_logging, get_logger
 
 
@@ -36,26 +38,34 @@ class TestGetLogger:
         ]
         assert len(file_handlers) > 0
 
-    def test_console_handler_level_is_info(self):
-        """Test that console handler is set to INFO level."""
-        logger = get_logger("test_console_level")
-        console_handlers = [
-            h
-            for h in logger.handlers
-            if isinstance(h, logging.StreamHandler)
-            and not isinstance(h, logging.FileHandler)
-        ]
-        if console_handlers:
-            assert console_handlers[0].level == logging.INFO
+    @pytest.mark.parametrize(
+        "handler_type,level_attribute,expected_level",
+        [
+            ("console", "console", logging.INFO),
+            ("file", "file", logging.DEBUG),
+        ],
+        ids=["console_info", "file_debug"],
+    )
+    def test_handler_levels(self, handler_type, level_attribute, expected_level):
+        """Test that handlers are set to correct levels."""
+        logger_name = f"test_{handler_type}_level_{level_attribute}"
+        logger = get_logger(logger_name)
 
-    def test_file_handler_level_is_debug(self):
-        """Test that file handler is set to DEBUG level."""
-        logger = get_logger("test_file_level")
-        file_handlers = [
-            h for h in logger.handlers if isinstance(h, logging.FileHandler)
-        ]
-        if file_handlers:
-            assert file_handlers[0].level == logging.DEBUG
+        if handler_type == "console":
+            console_handlers = [
+                h
+                for h in logger.handlers
+                if isinstance(h, logging.StreamHandler)
+                and not isinstance(h, logging.FileHandler)
+            ]
+            if console_handlers:
+                assert console_handlers[0].level == expected_level
+        elif handler_type == "file":
+            file_handlers = [
+                h for h in logger.handlers if isinstance(h, logging.FileHandler)
+            ]
+            if file_handlers:
+                assert file_handlers[0].level == expected_level
 
     def test_logger_level_is_debug(self):
         """Test that logger itself is set to DEBUG level."""
@@ -117,23 +127,16 @@ class TestConfigureLogging:
         # Should be at least INFO level
         assert root_logger.level >= logging.INFO
 
-    def test_configure_logging_with_custom_level(self):
-        """Test configure_logging with custom logging level."""
-        configure_logging(level=logging.DEBUG)
+    @pytest.mark.parametrize(
+        "level",
+        [logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL],
+        ids=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    )
+    def test_configure_logging_levels(self, level):
+        """Test configure_logging with various logging levels."""
+        configure_logging(level=level)
         photidy_logger = logging.getLogger("photidy")
-        assert photidy_logger.level == logging.DEBUG
-
-    def test_configure_logging_with_warning_level(self):
-        """Test configure_logging with WARNING level."""
-        configure_logging(level=logging.WARNING)
-        photidy_logger = logging.getLogger("photidy")
-        assert photidy_logger.level == logging.WARNING
-
-    def test_configure_logging_with_error_level(self):
-        """Test configure_logging with ERROR level."""
-        configure_logging(level=logging.ERROR)
-        photidy_logger = logging.getLogger("photidy")
-        assert photidy_logger.level == logging.ERROR
+        assert photidy_logger.level == level
 
     def test_configure_logging_affects_photidy_logger(self):
         """Test that configure_logging affects the 'photidy' logger."""

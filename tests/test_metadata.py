@@ -25,58 +25,22 @@ def db_path():
 class TestGetImageInfo:
     """Integration tests for get_image_info wrapper function."""
 
-    def test_valid_metadata_extraction_with_all_fields(self, suppress_logging):
-        """Test successful metadata extraction with both date and location."""
-        mock_result = {
-            "date_taken": "2024-01-15T14:30:45+00:00",
-            "lat": 40.5,
-            "lon": -74.0,
-            "location": "New York, New York, US",
-        }
+    @pytest.mark.parametrize(
+        "scenario",
+        ["complete", "date_only", "location_only", "no_exif"],
+        ids=["all_fields", "date_only", "location_only", "no_exif"],
+    )
+    def test_valid_metadata_extraction(
+        self, metadata_scenarios, scenario, suppress_logging
+    ):
+        """Test metadata extraction with various EXIF combinations."""
+        mock_result = metadata_scenarios[scenario]
         with patch("src.core.metadata.extract_metadata", return_value=mock_result):
             info = get_image_info("test.jpg")
             assert info == mock_result
-            assert "date_taken" in info
-            assert "location" in info
-
-    def test_valid_metadata_with_date_only(self, suppress_logging):
-        """Test metadata extraction with date but no location."""
-        mock_result = {
-            "date_taken": "2024-01-15T14:30:45+00:00",
-            "lat": None,
-            "lon": None,
-            "location": "Unknown location",
-        }
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            info = get_image_info("test.jpg")
-            assert info["date_taken"] == "2024-01-15T14:30:45+00:00"
-            assert info["location"] == "Unknown location"
-
-    def test_valid_metadata_with_location_only(self, suppress_logging):
-        """Test metadata extraction with location but no date."""
-        mock_result = {
-            "date_taken": None,
-            "lat": 40.5,
-            "lon": -74.0,
-            "location": "New York, New York, US",
-        }
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            info = get_image_info("test.jpg")
-            assert info["date_taken"] is None
-            assert info["location"] == "New York, New York, US"
-
-    def test_valid_metadata_with_no_exif(self, suppress_logging):
-        """Test metadata extraction when no EXIF data is available."""
-        mock_result = {
-            "date_taken": None,
-            "lat": None,
-            "lon": None,
-            "location": "Unknown location",
-        }
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            info = get_image_info("test.jpg")
-            assert info["date_taken"] is None
-            assert info["location"] == "Unknown location"
+            if scenario == "complete":
+                assert "date_taken" in info
+                assert "location" in info
 
     def test_unsupported_file_format_raises_error(self, suppress_logging):
         """Test that unsupported file format raises InvalidPhotoFormatError."""
@@ -101,83 +65,55 @@ class TestGetImageInfo:
                 get_image_info("test.jpg")
             assert "Unexpected error processing" in str(exc_info.value)
 
-    def test_supported_formats_accepted(self, suppress_logging):
-        """Test that all supported image formats are accepted."""
-        supported_formats = (".jpg", ".jpeg", ".png", ".tiff", ".raw", ".cr2", ".heic")
-        mock_result = {
-            "date_taken": None,
-            "lat": None,
-            "lon": None,
-            "location": "Unknown location",
-        }
-
-        for fmt in supported_formats:
-            with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-                # Should not raise InvalidPhotoFormatError
-                info = get_image_info(f"test{fmt}")
-                assert info is not None
-
-    def test_case_insensitive_format_validation(self, suppress_logging):
-        """Test that format validation is case-insensitive."""
-        mock_result = {
-            "date_taken": None,
-            "lat": None,
-            "lon": None,
-            "location": "Unknown location",
-        }
-
+    @pytest.mark.parametrize(
+        "file_format",
+        [".jpg", ".jpeg", ".png", ".tiff", ".raw", ".cr2", ".heic"],
+        ids=["jpg", "jpeg", "png", "tiff", "raw", "cr2", "heic"],
+    )
+    def test_supported_format_accepted(
+        self, metadata_scenarios, file_format, suppress_logging
+    ):
+        """Test that each supported image format is accepted."""
+        mock_result = metadata_scenarios["no_exif"]
         with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            # Should not raise - uppercase format should be accepted
+            info = get_image_info(f"test{file_format}")
+            assert info is not None
+
+    def test_case_insensitive_format_validation(
+        self, metadata_scenarios, suppress_logging
+    ):
+        """Test that format validation is case-insensitive."""
+        mock_result = metadata_scenarios["no_exif"]
+        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
             info = get_image_info("test.JPG")
             assert info is not None
 
-    def test_logging_success_with_date(self, caplog):
+    def test_logging_success_with_date(self, metadata_scenarios, caplog):
         """Test that successful extraction with date is logged."""
-        mock_result = {
-            "date_taken": "2024-01-15T14:30:45+00:00",
-            "lat": None,
-            "lon": None,
-            "location": "Unknown location",
-        }
+        mock_result = metadata_scenarios["date_only"]
         with patch("src.core.metadata.extract_metadata", return_value=mock_result):
             get_image_info("test.jpg")
             assert "Extracted date info" in caplog.text
 
-    def test_logging_success_with_location(self, caplog):
+    def test_logging_success_with_location(self, metadata_scenarios, caplog):
         """Test that successful location extraction is logged."""
-        mock_result = {
-            "date_taken": None,
-            "lat": 40.5,
-            "lon": -74.0,
-            "location": "New York, New York, US",
-        }
+        mock_result = metadata_scenarios["location_only"]
         with patch("src.core.metadata.extract_metadata", return_value=mock_result):
             get_image_info("test.jpg")
             assert "Extracted location info" in caplog.text
 
-    def test_logging_warning_no_date(self, caplog):
+    def test_logging_warning_no_date(self, metadata_scenarios, caplog):
         """Test that missing date is logged as warning."""
-        mock_result = {
-            "date_taken": None,
-            "lat": None,
-            "lon": None,
-            "location": "Unknown location",
-        }
+        mock_result = metadata_scenarios["no_exif"]
         with patch("src.core.metadata.extract_metadata", return_value=mock_result):
             get_image_info("test.jpg")
             assert "No date info found" in caplog.text
 
-    def test_logging_warning_no_location(self, caplog):
+    def test_logging_warning_no_location(self, metadata_scenarios, caplog):
         """Test that missing location is logged."""
-        mock_result = {
-            "date_taken": "2024-01-15T14:30:45+00:00",
-            "lat": None,
-            "lon": None,
-            "location": "Unknown location",
-        }
+        mock_result = metadata_scenarios["date_only"]
         with patch("src.core.metadata.extract_metadata", return_value=mock_result):
             get_image_info("test.jpg")
-            # Location is considered "Unknown" not an error - just log for info
             assert "location" in caplog.text.lower()
 
     def test_logging_error_invalid_format(self, caplog):
@@ -233,9 +169,9 @@ class TestRustExtractMetadataIntegration:
             assert -90.0 <= result["lat"] <= 90.0
             assert -180.0 <= result["lon"] <= 180.0
 
-            # Verify location has proper structure or "Unknown location"
+            # Verify location has proper structure or "Unknown Location"
             location = result["location"]
-            if location != "Unknown location":
+            if location != "Unknown Location":
                 parts = [p.strip() for p in location.split(",")]
                 assert len(parts) in (2, 3), (
                     f"Location should have 2-3 parts, got {len(parts)}: {location}"
@@ -259,7 +195,7 @@ class TestRustExtractMetadataIntegration:
         assert result["date_taken"] is None
         assert result["lat"] is None
         assert result["lon"] is None
-        assert result["location"] == "Unknown location"
+        assert result["location"] == "Unknown Location"
 
     def test_extract_metadata_with_gps_only(self, db_path):
         """Test extract_metadata with GPS data but no date."""
@@ -292,7 +228,7 @@ class TestRustExtractMetadataIntegration:
         assert result["date_taken"] is not None
         assert result["lat"] is None
         assert result["lon"] is None
-        assert result["location"] == "Unknown location"
+        assert result["location"] == "Unknown Location"
 
         # Verify date format is valid RFC3339
         from datetime import datetime
