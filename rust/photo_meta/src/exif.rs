@@ -3,8 +3,9 @@ use std::io::BufReader;
 use exif::{Reader, Tag, In};
 use chrono::{DateTime, NaiveDateTime};
 
+use crate::errors::PhotoMetaError;
 use crate::gps::extract_gps;
-use crate::models::ExifData;
+use crate::models::ExtractedMetadata;
 
 pub fn parse_datetime(datetime_str: &str) -> Option<DateTime<chrono::Utc>> {
     NaiveDateTime::parse_from_str(datetime_str, "%Y-%m-%d %H:%M:%S")
@@ -16,27 +17,31 @@ pub fn parse_datetime(datetime_str: &str) -> Option<DateTime<chrono::Utc>> {
         .map(|dt| DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc))
 }
 
-pub fn extract_exif(path: &str) -> ExifData {
-    let file = match File::open(path) {
-        Ok(f) => f,
-        Err(_) => return ExifData { timestamp: None, lat: None, lon: None },
-    };
-
+pub fn extract_exif(path: &str) -> Result<ExtractedMetadata, PhotoMetaError> {
+    let file = File::open(path).map_err(PhotoMetaError::Io)?;
     let mut bufreader = BufReader::new(file);
     let exif = match Reader::new().read_from_container(&mut bufreader) {
-        Ok(e) => e,
-        Err(_) => return ExifData { timestamp: None, lat: None, lon: None },
+        Ok(exif) => exif,
+        Err(_) => {
+            // No EXIF data found, return empty metadata
+            return Ok(ExtractedMetadata {
+                timestamp: None,
+                lat: None,
+                lon: None,
+            });
+        }
     };
 
     let timestamp = exif.get_field(Tag::DateTimeOriginal, In::PRIMARY)
         .or_else(|| exif.get_field(Tag::DateTime, In::PRIMARY))
-        .and_then(|f| parse_datetime(&f.display_value().to_string()));
+        .and_then(|f| parse_datetime(&f.display_value().to_string()))
+        .map(|dt| dt.to_rfc3339());
 
     let (lat, lon) = extract_gps(&exif)
         .map(|(lat, lon)| (Some(lat), Some(lon)))
         .unwrap_or((None, None));
 
-    ExifData { timestamp, lat, lon }
+    Ok(ExtractedMetadata { timestamp, lat, lon })
 }
 
 #[cfg(test)]
@@ -111,25 +116,21 @@ mod tests {
 
     #[test]
     fn test_extract_exif_from_nonexistent_file() {
-        let exif_data = extract_exif("/nonexistent/path/file.jpg");
-        assert!(exif_data.timestamp.is_none());
-        assert!(exif_data.lat.is_none());
-        assert!(exif_data.lon.is_none());
+        let result = extract_exif("/nonexistent/path/file.jpg");
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_extract_exif_from_invalid_image_file() {
         let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/not_an_image.txt");
         let result = extract_exif(fixture_path);
-        assert!(result.timestamp.is_none());
-        assert!(result.lat.is_none());
-        assert!(result.lon.is_none());
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_extract_exif_from_image_without_exif() {
         let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/no_exif.jpg");
-        let result = extract_exif(fixture_path);
+        let result = extract_exif(fixture_path).unwrap();
         assert!(result.timestamp.is_none());
         assert!(result.lat.is_none());
         assert!(result.lon.is_none());
@@ -138,7 +139,7 @@ mod tests {
     #[test]
     fn test_extract_exif_with_complete_data() {
         let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/complete_exif.jpg");
-        let result = extract_exif(fixture_path);
+        let result = extract_exif(fixture_path).unwrap();
         assert!(result.timestamp.is_some());
         assert!(result.lat.is_some());
         assert!(result.lon.is_some());
@@ -149,7 +150,7 @@ mod tests {
     #[test]
     fn test_extract_exif_with_only_gps_no_date() {
         let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/only_gps.jpg");
-        let result = extract_exif(fixture_path);
+        let result = extract_exif(fixture_path).unwrap();
         assert!(result.timestamp.is_none());
         assert!(result.lat.is_some());
         assert!(result.lon.is_some());
@@ -158,7 +159,7 @@ mod tests {
     #[test]
     fn test_extract_exif_with_only_date_no_gps() {
         let fixture_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/only_date.jpg");
-        let result = extract_exif(fixture_path);
+        let result = extract_exif(fixture_path).unwrap();
         assert!(result.timestamp.is_some());
         assert!(result.lat.is_none());
         assert!(result.lon.is_none());

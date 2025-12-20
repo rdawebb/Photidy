@@ -1,5 +1,5 @@
 use crate::haversine::haversine;
-use crate::models::{Candidate, Place, PlaceKind};
+use crate::models::{Candidate, Place};
 
 pub fn score(c: &Candidate, lat: f64, lon: f64) -> Option<f64> {
     let distance = haversine(lat, lon, c.lat, c.lon);
@@ -7,10 +7,11 @@ pub fn score(c: &Candidate, lat: f64, lon: f64) -> Option<f64> {
         return None;
     }
 
-    let kind_bias = match c.kind {
-        PlaceKind::Landmark => 8.0,
-        PlaceKind::City => 3.0,
-        PlaceKind::Town => 1.0,
+    let kind_bias = match c.kind.as_str() {
+        "landmark" => 8.0,
+        "city" => 3.0,
+        "town" => 1.0,
+        _ => 0.0,
     };
 
     Some(
@@ -29,7 +30,7 @@ pub fn select_best(candidates: Vec<Candidate>, lat: f64, lon: f64) -> Option<Pla
             name: candidate.name.clone(),
             country: candidate.country.clone(),
             admin: candidate.admin.clone(),
-            kind: candidate.kind,
+            kind: candidate.kind.clone(),
         })
 }
 
@@ -41,7 +42,7 @@ mod tests {
         name: &str,
         lat: f64,
         lon: f64,
-        kind: PlaceKind,
+        kind: &str,
         importance: f64,
     ) -> Candidate {
         Candidate {
@@ -50,14 +51,14 @@ mod tests {
             admin: Some("Test Admin".to_string()),
             lat,
             lon,
-            kind,
+            kind: kind.to_string(),
             importance,
         }
     }
 
     #[test]
     fn test_score_within_distance_threshold() {
-        let candidate = create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.9);
+        let candidate = create_test_candidate("London", 51.5074, -0.1278, "city", 0.9);
         let score = score(&candidate, 51.5074, -0.1278);
         assert!(score.is_some());
         assert!(score.unwrap() > 0.0); // High score for exact location
@@ -65,16 +66,16 @@ mod tests {
 
     #[test]
     fn test_score_beyond_distance_threshold() {
-        let candidate = create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.9);
+        let candidate = create_test_candidate("London", 51.5074, -0.1278, "city", 0.9);
         let score = score(&candidate, 0.0, 0.0);
         assert!(score.is_none()); // Beyond 50 km
     }
 
     #[test]
     fn test_score_landmark_has_highest_bias() {
-        let landmark = create_test_candidate("Tower of London", 51.5081, -0.0759, PlaceKind::Landmark, 0.5);
-        let city = create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.5);
-        let town = create_test_candidate("Richmond", 51.4415, -0.3005, PlaceKind::Town, 0.5);
+        let landmark = create_test_candidate("Tower of London", 51.5081, -0.0759, "landmark", 0.5);
+        let city = create_test_candidate("London", 51.5074, -0.1278, "city", 0.5);
+        let town = create_test_candidate("Richmond", 51.4415, -0.3005, "town", 0.5);
 
         let test_lat = 51.5074;
         let test_lon = -0.1278;
@@ -89,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_score_considers_distance() {
-        let candidate = create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.9);
+        let candidate = create_test_candidate("London", 51.5074, -0.1278, "city", 0.9);
 
         let score_at_location = score(&candidate, 51.5074, -0.1278).unwrap();
         let score_10km_away = score(&candidate, 51.4074, -0.1278).unwrap();
@@ -100,9 +101,9 @@ mod tests {
     #[test]
     fn test_select_best_returns_highest_scoring_candidate() {
         let candidates = vec![
-            create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.9),
-            create_test_candidate("Richmond", 51.4415, -0.3005, PlaceKind::Town, 0.7),
-            create_test_candidate("Camden", 51.5416, -0.1425, PlaceKind::Town, 0.6),
+            create_test_candidate("London", 51.5074, -0.1278, "city", 0.9),
+            create_test_candidate("Richmond", 51.4415, -0.3005, "town", 0.7),
+            create_test_candidate("Camden", 51.5416, -0.1425, "town", 0.6),
         ];
 
         let result = select_best(candidates, 51.5074, -0.1278);
@@ -121,7 +122,7 @@ mod tests {
     #[test]
     fn test_select_best_transforms_to_place_struct() {
         let candidates = vec![
-            create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.9),
+            create_test_candidate("London", 51.5074, -0.1278, "city", 0.9),
         ];
 
         let result = select_best(candidates, 51.5074, -0.1278);
@@ -130,14 +131,14 @@ mod tests {
         assert_eq!(place.name, "London");
         assert_eq!(place.country, "UK");
         assert!(place.admin.is_some());
-        assert_eq!(place.kind, PlaceKind::City);
+        assert_eq!(place.kind, "city");
     }
 
     #[test]
     fn test_select_best_filters_out_distant_candidates() {
         let candidates = vec![
-            create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.9),
-            create_test_candidate("Paris", 48.8566, 2.3522, PlaceKind::City, 0.95), // ~340 km away
+            create_test_candidate("London", 51.5074, -0.1278, "city", 0.9),
+            create_test_candidate("Paris", 48.8566, 2.3522, "city", 0.95), // ~340 km away
         ];
 
         let result = select_best(candidates, 51.5074, -0.1278);
@@ -149,8 +150,8 @@ mod tests {
     #[test]
     fn test_select_best_with_tie_scores() {
         let candidates = vec![
-            create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.7),
-            create_test_candidate("Camden", 51.5074, -0.1278, PlaceKind::City, 0.7),
+            create_test_candidate("London", 51.5074, -0.1278, "city", 0.7),
+            create_test_candidate("Camden", 51.5074, -0.1278, "city", 0.7),
         ];
 
         let result = select_best(candidates, 51.5074, -0.1278);
@@ -163,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_score_at_50km_boundary() {
-        let candidate = create_test_candidate("London", 51.5074, -0.1278, PlaceKind::City, 0.9);
+        let candidate = create_test_candidate("London", 51.5074, -0.1278, "city", 0.9);
 
         // Approx 50 km north of London
         let score = score(&candidate, 51.9574, -0.1278);

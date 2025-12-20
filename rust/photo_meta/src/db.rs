@@ -1,42 +1,23 @@
-use std::path::Path;
 use rusqlite::{Connection, params};
+use std::path::Path;
 
 use crate::compat;
-use crate::errors::DbError;
-use crate::models::{Candidate, PlaceKind};
+use crate::errors::PhotoMetaError;
+use crate::models::Candidate;
 
-pub fn db_filename() -> &'static str {
-    "places_v0.1.db"
-}
-
-pub fn validate_db(path: &Path) -> Result<(), DbError> {
-    let conn = Connection::open(path)
-        .map_err(DbError::Open)?;
-    
-    compat::assert_compatible(&conn)
-        .map_err(DbError::Incompatible)?;
-
-    Ok(())
-}
-
-pub fn get_db(path: &Path) -> Result<Connection, DbError> {
-    let conn = Connection::open(path)
-        .map_err(DbError::Open)?;
-
-    compat::assert_compatible(&conn)
-        .map_err(DbError::Incompatible)?;
-
+pub fn open_db(path: &Path) -> Result<Connection, PhotoMetaError> {
+    let conn = Connection::open(path).map_err(PhotoMetaError::Database)?;
+    compat::assert_compatible(&conn)?;
     Ok(conn)
 }
 
 pub fn fetch_candidates(
-    path: &Path,
+    conn: &Connection,
     lat: f64,
     lon: f64,
-) -> Result<Vec<Candidate>, DbError> {
-    let conn = get_db(path)?;
-
+) -> Result<Vec<Candidate>, PhotoMetaError> {
     let delta = 0.5; // degrees (~55 km)
+
     let mut stmt = conn.prepare(
         r#"
         SELECT name, country, admin, lat, lon, kind, importance
@@ -46,30 +27,31 @@ pub fn fetch_candidates(
         ORDER BY importance DESC
         LIMIT 50
         "#,
-    ).map_err(DbError::Query)?;
+    ).map_err(PhotoMetaError::Database)?;
 
     let rows = stmt.query_map(
         params![lat - delta, lat + delta, lon - delta, lon + delta],
         |row| {
-            let kind: String = row.get(5)?;
             Ok(Candidate {
                 name: row.get(0)?,
                 country: row.get(1)?,
                 admin: row.get(2)?,
                 lat: row.get(3)?,
                 lon: row.get(4)?,
-                kind: match kind.as_str() {
-                    "landmark" => PlaceKind::Landmark,
-                    "city" => PlaceKind::City,
-                    _ => PlaceKind::Town,
+                kind: {
+                    let kind_str: String = row.get(5)?;
+                    match kind_str.as_str() {
+                        "city" | "landmark" | "town" => kind_str,
+                        _ => "town".to_string(),
+                    }
                 },
                 importance: row.get(6)?,
             })
         },
-    ).map_err(DbError::Query)?;
+    ).map_err(PhotoMetaError::Database)?;
 
     rows.collect::<Result<_, _>>()
-        .map_err(DbError::Query)
+        .map_err(PhotoMetaError::Database)
 }
 
 #[cfg(test)]
@@ -132,7 +114,8 @@ mod tests {
     #[test]
     fn test_fetch_candidates_returns_all_in_range() {
         let (_temp, path) = setup_test_db();
-        let result = fetch_candidates(&path, 51.5074, -0.1278);
+        let conn = open_db(&path).expect("Failed to open test DB");
+        let result = fetch_candidates(&conn, 51.5074, -0.1278);
 
         assert!(result.is_ok());
         let candidates = result.unwrap();
@@ -142,7 +125,8 @@ mod tests {
     #[test]
     fn test_fetch_candidates_filters_by_distance() {
         let (_temp, path) = setup_test_db();
-        let result = fetch_candidates(&path, 0.0, 0.0);
+        let conn = open_db(&path).expect("Failed to open test DB");
+        let result = fetch_candidates(&conn, 0.0, 0.0);
 
         assert!(result.is_ok());
         let candidates = result.unwrap();
@@ -152,16 +136,17 @@ mod tests {
     #[test]
     fn test_fetch_candidates_converts_string_kind_to_enum() {
         let (_temp, path) = setup_test_db();
-        let result = fetch_candidates(&path, 51.5074, -0.1278);
+        let conn = open_db(&path).expect("Failed to open test DB");
+        let result = fetch_candidates(&conn, 51.5074, -0.1278);
 
         assert!(result.is_ok());
         let candidates = result.unwrap();
         
         for candidate in candidates {
             match candidate.name.as_str() {
-                "London" => assert_eq!(candidate.kind, PlaceKind::City),
-                "Richmond" => assert_eq!(candidate.kind, PlaceKind::Town),
-                "Tower Bridge" => assert_eq!(candidate.kind, PlaceKind::Landmark),
+                "London" => assert_eq!(candidate.kind, "city"),
+                "Richmond" => assert_eq!(candidate.kind, "town"),
+                "Tower Bridge" => assert_eq!(candidate.kind, "landmark"),
                 _ => panic!("Unexpected candidate name"),
             }
         }
@@ -170,8 +155,7 @@ mod tests {
     #[test]
     fn test_fetch_candidates_respects_limit() {
         let (_temp, path) = setup_test_db();
-        let conn = Connection::open(&path)
-            .expect("Failed to open test DB");
+        let conn = open_db(&path).expect("Failed to open test DB");
 
         // Insert additional entries to exceed the limit
         for i in 0..60 {
@@ -181,9 +165,9 @@ mod tests {
                 params![name, "UK", None::<String>, 51.5 + (i as f64 * 0.001), -0.1 - (i as f64 * 0.001), "town", 0.5],
             ).expect("Failed to insert test data");
         }
-        drop(conn);
 
-        let result = fetch_candidates(&path, 51.5074, -0.1278);
+        let result = fetch_candidates(&conn, 51.5074, -0.1278);
+        drop(conn);
 
         assert!(result.is_ok());
         let candidates = result.unwrap();
@@ -193,7 +177,8 @@ mod tests {
     #[test]
     fn test_fetch_candidates_orders_by_importance() {
         let (_temp, path) = setup_test_db();
-        let result = fetch_candidates(&path, 51.5074, -0.1278);
+        let conn = open_db(&path).expect("Failed to open test DB");
+        let result = fetch_candidates(&conn, 51.5074, -0.1278);
 
         assert!(result.is_ok());
         let candidates = result.unwrap();
@@ -208,14 +193,15 @@ mod tests {
     #[test]
     fn test_fetch_candidates_with_invalid_db_path() {
         let invalid_path = Path::new("/nonexistent/path/places.db");
-        let result = fetch_candidates(invalid_path, 51.5074, -0.1278);
+        let result = open_db(&invalid_path);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_fetch_candidates_with_no_matching_entries() {
         let (_temp, path) = setup_test_db();
-        let result = fetch_candidates(&path, 90.0, 180.0);
+        let conn = open_db(&path).expect("Failed to open test DB");
+        let result = fetch_candidates(&conn, 90.0, 180.0);
         assert!(result.is_ok());
         let candidates = result.unwrap();
         assert_eq!(candidates.len(), 0);
@@ -224,16 +210,16 @@ mod tests {
     #[test]
     fn test_fetch_candidates_with_null_admin_field() {
         let (_temp, path) = setup_test_db();
-        let conn = Connection::open(&path)
-            .expect("Failed to open test DB");
+        let conn = open_db(&path).expect("Failed to open test DB");
 
         conn.execute(
             "INSERT INTO places VALUES (?, ?, ?, ?, ?, ?, ?)",
             params!["NoAdminPlace", "UK", None::<String>, 51.5, -0.1, "town", 0.6],
         ).expect("Failed to insert test data");
+
+        let result = fetch_candidates(&conn, 51.5, -0.1);
         drop(conn);
 
-        let result = fetch_candidates(&path, 51.5, -0.1);
         assert!(result.is_ok());
         let candidates = result.unwrap();
         let no_admin_place = candidates.iter().find(|c| c.name == "NoAdminPlace");
@@ -244,20 +230,20 @@ mod tests {
     #[test]
     fn test_fetch_candidates_with_unknown_kind() {
         let (_temp, path) = setup_test_db();
-        let conn = Connection::open(&path)
-            .expect("Failed to open test DB");
+        let conn = open_db(&path).expect("Failed to open test DB");
 
         conn.execute(
             "INSERT INTO places VALUES (?, ?, ?, ?, ?, ?, ?)",
             params!["UnknownPlace", "UK", Some("SomeAdmin"), 51.5, -0.1, "unknown_kind", 0.6],
         ).expect("Failed to insert test data");
+
+        let result = fetch_candidates(&conn, 51.5, -0.1);
         drop(conn);
 
-        let result = fetch_candidates(&path, 51.5, -0.1);
         assert!(result.is_ok());
         let candidates = result.unwrap();
         let unknown = candidates.iter().find(|c| c.name == "UnknownPlace");
         assert!(unknown.is_some());
-        assert_eq!(unknown.unwrap().kind, PlaceKind::Town); // Default to Town
+        assert_eq!(unknown.unwrap().kind, "town"); // Default to Town
     }
 }

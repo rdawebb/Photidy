@@ -1,13 +1,15 @@
-use std::path::Path;
+use rusqlite::Connection;
+
 use crate::db;
+use crate::errors::PhotoMetaError;
 use crate::models::Place;
 use crate::scoring;
 
 pub fn reverse_geocode(
-    db_path: &Path,
+    conn: &Connection,
     lat: f64,
     lon: f64,
-) -> Option<Place> {
-    let candidates = db::fetch_candidates(db_path, lat, lon).ok()?;
-    scoring::select_best(candidates, lat, lon)
+) -> Result<Option<Place>, PhotoMetaError> {
+    let candidates = db::fetch_candidates(conn, lat, lon)?;
+    Ok(scoring::select_best(candidates, lat, lon))
 }

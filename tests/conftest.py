@@ -102,25 +102,29 @@ def metadata_scenarios():
     """Fixture providing metadata results for different scenarios."""
     return {
         "complete": {
-            "date_taken": "2024-01-15T14:30:45+00:00",
+            "path": "test.jpg",
+            "timestamp": "2024-01-15T14:30:45+00:00",
             "lat": 40.5,
             "lon": -74.0,
             "location": "New York, New York, US",
         },
         "date_only": {
-            "date_taken": "2024-01-15T14:30:45+00:00",
+            "path": "test.jpg",
+            "timestamp": "2024-01-15T14:30:45+00:00",
             "lat": None,
             "lon": None,
             "location": "Unknown Location",
         },
         "location_only": {
-            "date_taken": None,
+            "path": "test.jpg",
+            "timestamp": None,
             "lat": 40.5,
             "lon": -74.0,
             "location": "New York, New York, US",
         },
         "no_exif": {
-            "date_taken": None,
+            "path": "test.jpg",
+            "timestamp": None,
             "lat": None,
             "lon": None,
             "location": "Unknown Location",
@@ -132,7 +136,8 @@ def metadata_scenarios():
 def mock_image_info_complete():
     """Fixture providing complete image info for testing."""
     return {
-        "date_taken": datetime(2024, 1, 15, 14, 30, 45),
+        "path": "test.jpg",
+        "timestamp": datetime(2024, 1, 15, 14, 30, 45),
         "location": "New York, New York, US",
     }
 

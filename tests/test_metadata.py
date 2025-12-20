@@ -4,7 +4,7 @@ This module tests the integration between the Python wrapper and Rust backend.
 Rust implementation details (EXIF parsing, GPS coordinate conversion, geocoding) are tested in the Rust test suites.
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,14 +12,28 @@ from src.core.metadata import get_image_info
 from src.utils.errors import InvalidPhotoFormatError, PhotoMetadataError
 
 
+def create_mock_extracted_metadata(timestamp=None, lat=None, lon=None):
+    """Create a mock Rust ExtractedMetadata object."""
+    mock = MagicMock()
+    mock.timestamp = timestamp
+    mock.lat = lat
+    mock.lon = lon
+    return mock
+
+
+def create_mock_place(name="Unknown Location"):
+    """Create a mock Rust Place object."""
+    mock = MagicMock()
+    mock.name = name
+    return mock
+
+
 @pytest.fixture
 def db_path():
     """Fixture that provides the embedded database path for tests."""
-    from pathlib import Path
-    import photo_meta
+    from runtime.paths import db_path
 
-    db_dir = Path(__file__).parent.parent / "rust/photo_meta/data"
-    return str(db_dir / photo_meta.db_filename())
+    return db_path()
 
 
 class TestGetImageInfo:
@@ -34,13 +48,29 @@ class TestGetImageInfo:
         self, metadata_scenarios, scenario, suppress_logging
     ):
         """Test metadata extraction with various EXIF combinations."""
-        mock_result = metadata_scenarios[scenario]
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            info = get_image_info("test.jpg")
-            assert info == mock_result
-            if scenario == "complete":
-                assert "date_taken" in info
-                assert "location" in info
+        scenario_data = metadata_scenarios[scenario]
+
+        # Create mock Rust ExtractedMetadata (without location field)
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+
+        # Create mock Place object for reverse_geocode
+        mock_place = None
+        if scenario_data["location"] != "Unknown Location":
+            mock_place = create_mock_place(scenario_data["location"])
+
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
+                info = get_image_info("test.jpg")
+                assert info.location == scenario_data["location"]
+                if scenario == "complete":
+                    assert info.timestamp is not None
+                    assert info.location is not None
 
     def test_unsupported_file_format_raises_error(self, suppress_logging):
         """Test that unsupported file format raises InvalidPhotoFormatError."""
@@ -74,47 +104,96 @@ class TestGetImageInfo:
         self, metadata_scenarios, file_format, suppress_logging
     ):
         """Test that each supported image format is accepted."""
-        mock_result = metadata_scenarios["no_exif"]
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            info = get_image_info(f"test{file_format}")
-            assert info is not None
+        scenario_data = metadata_scenarios["no_exif"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=None):
+                info = get_image_info(f"test{file_format}")
+                assert info is not None
 
     def test_case_insensitive_format_validation(
         self, metadata_scenarios, suppress_logging
     ):
         """Test that format validation is case-insensitive."""
-        mock_result = metadata_scenarios["no_exif"]
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            info = get_image_info("test.JPG")
-            assert info is not None
+        scenario_data = metadata_scenarios["no_exif"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=None):
+                info = get_image_info("test.JPG")
+                assert info is not None
 
     def test_logging_success_with_date(self, metadata_scenarios, caplog):
         """Test that successful extraction with date is logged."""
-        mock_result = metadata_scenarios["date_only"]
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            get_image_info("test.jpg")
-            assert "Extracted date info" in caplog.text
+        scenario_data = metadata_scenarios["date_only"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=None):
+                get_image_info("test.jpg")
+                assert "Extracted date info" in caplog.text
 
     def test_logging_success_with_location(self, metadata_scenarios, caplog):
         """Test that successful location extraction is logged."""
-        mock_result = metadata_scenarios["location_only"]
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            get_image_info("test.jpg")
-            assert "Extracted location info" in caplog.text
+        scenario_data = metadata_scenarios["location_only"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+        mock_place = create_mock_place(scenario_data["location"])
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
+                get_image_info("test.jpg")
+                assert "Extracted location info" in caplog.text
 
     def test_logging_warning_no_date(self, metadata_scenarios, caplog):
         """Test that missing date is logged as warning."""
-        mock_result = metadata_scenarios["no_exif"]
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            get_image_info("test.jpg")
-            assert "No date info found" in caplog.text
+        scenario_data = metadata_scenarios["no_exif"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=None):
+                get_image_info("test.jpg")
+                assert "No timestamp found" in caplog.text
 
     def test_logging_warning_no_location(self, metadata_scenarios, caplog):
         """Test that missing location is logged."""
-        mock_result = metadata_scenarios["date_only"]
-        with patch("src.core.metadata.extract_metadata", return_value=mock_result):
-            get_image_info("test.jpg")
-            assert "location" in caplog.text.lower()
+        scenario_data = metadata_scenarios["date_only"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=None):
+                get_image_info("test.jpg")
+                assert "No location found" in caplog.text
 
     def test_logging_error_invalid_format(self, caplog):
         """Test that invalid file format is logged as error."""
@@ -123,16 +202,133 @@ class TestGetImageInfo:
         assert "Unsupported file format" in caplog.text
 
     def test_returns_rust_result_unchanged(self, suppress_logging):
-        """Test that the function returns the Rust result without modification."""
-        expected_result = {
-            "date_taken": "2024-01-15T14:30:45+00:00",
-            "lat": 40.7128,
-            "lon": -74.006,
-            "location": "New York, New York, US",
-        }
-        with patch("src.core.metadata.extract_metadata", return_value=expected_result):
-            result = get_image_info("test.jpg")
-            assert result == expected_result
+        """Test that the function correctly constructs ImageInfo from Rust data."""
+        # Create mock Rust ExtractedMetadata
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp="2024-01-15T14:30:45+00:00",
+            lat=40.7128,
+            lon=-74.006,
+        )
+        # Create mock Place for reverse_geocode
+        mock_place = create_mock_place("New York, New York, US")
+
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
+                result = get_image_info("test.jpg")
+                assert result.path == "test.jpg"
+                assert result.timestamp is not None
+                assert result.lat == 40.7128
+                assert result.lon == -74.006
+                assert result.location == "New York, New York, US"
+
+
+class TestReverseGeocodeIntegration:
+    """Tests for reverse_geocode integration in get_image_info."""
+
+    def test_reverse_geocode_called_with_valid_coordinates(
+        self, metadata_scenarios, suppress_logging
+    ):
+        """Test that reverse_geocode is called when GPS coordinates are available."""
+        scenario_data = metadata_scenarios["location_only"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+        mock_place = create_mock_place(scenario_data["location"])
+
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch(
+                "src.core.metadata.reverse_geocode", return_value=mock_place
+            ) as mock_geocode:
+                get_image_info("test.jpg")
+                # Verify reverse_geocode was called with the correct coordinates
+                mock_geocode.assert_called_once()
+                call_args = mock_geocode.call_args
+                assert call_args[0][0] == scenario_data["lat"]
+                assert call_args[0][1] == scenario_data["lon"]
+
+    def test_reverse_geocode_not_called_without_coordinates(
+        self, metadata_scenarios, suppress_logging
+    ):
+        """Test that reverse_geocode is not called when GPS coordinates are missing."""
+        scenario_data = metadata_scenarios["date_only"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode") as mock_geocode:
+                get_image_info("test.jpg")
+                # Verify reverse_geocode was NOT called
+                mock_geocode.assert_not_called()
+
+    def test_reverse_geocode_returns_none_defaults_to_unknown_location(
+        self, metadata_scenarios, suppress_logging
+    ):
+        """Test that missing location defaults to 'Unknown Location' when reverse_geocode returns None."""
+        scenario_data = metadata_scenarios["location_only"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=None):
+                info = get_image_info("test.jpg")
+                assert info.location == "Unknown Location"
+
+    def test_reverse_geocode_returns_place_name_correctly(
+        self, metadata_scenarios, suppress_logging
+    ):
+        """Test that the location is correctly extracted from reverse_geocode Place object."""
+        scenario_data = metadata_scenarios["complete"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+        mock_place = create_mock_place("San Francisco, California, US")
+
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
+                info = get_image_info("test.jpg")
+                assert info.location == "San Francisco, California, US"
+
+    def test_reverse_geocode_exception_handling(
+        self, metadata_scenarios, suppress_logging
+    ):
+        """Test that exceptions from reverse_geocode are caught and re-raised as PhotoMetadataError."""
+        scenario_data = metadata_scenarios["location_only"]
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch(
+                "src.core.metadata.reverse_geocode",
+                side_effect=RuntimeError("Geocoding failed"),
+            ):
+                with pytest.raises(PhotoMetadataError) as exc_info:
+                    get_image_info("test.jpg")
+                assert "Unexpected error processing" in str(exc_info.value)
 
 
 class TestRustExtractMetadataIntegration:
@@ -141,96 +337,76 @@ class TestRustExtractMetadataIntegration:
     These tests verify the output format and correctness of the Rust metadata extraction.
     """
 
-    def test_extract_metadata_with_complete_exif(self, db_path):
-        """Test extract_metadata with complete EXIF data (date and location)."""
+    def test_extract_metadata_with_complete_exif(self):
+        """Test extract_metadata with complete EXIF data (date and GPS)."""
         from photo_meta import extract_metadata
 
-        result = extract_metadata(
-            "rust/photo_meta/tests/fixtures/complete_exif.jpg", db_path
-        )
+        result = extract_metadata("rust/photo_meta/tests/fixtures/complete_exif.jpg")
 
-        # Verify all required keys exist
-        assert "date_taken" in result
-        assert "lat" in result
-        assert "lon" in result
-        assert "location" in result
+        # Verify all required attributes exist
+        assert hasattr(result, "timestamp")
+        assert hasattr(result, "lat")
+        assert hasattr(result, "lon")
 
-        # Verify date_taken is valid RFC3339
-        if result["date_taken"] is not None:
+        # Verify timestamp is valid RFC3339
+        if result.timestamp is not None:
             # Should be parseable as ISO format datetime
             from datetime import datetime
 
-            datetime.fromisoformat(result["date_taken"].replace("Z", "+00:00"))
+            datetime.fromisoformat(result.timestamp.replace("Z", "+00:00"))
 
         # Verify lat/lon are valid floats in correct range
-        if result["lat"] is not None and result["lon"] is not None:
-            assert isinstance(result["lat"], float)
-            assert isinstance(result["lon"], float)
-            assert -90.0 <= result["lat"] <= 90.0
-            assert -180.0 <= result["lon"] <= 180.0
+        if result.lat is not None and result.lon is not None:
+            assert isinstance(result.lat, float)
+            assert isinstance(result.lon, float)
+            assert -90.0 <= result.lat <= 90.0
+            assert -180.0 <= result.lon <= 180.0
 
-            # Verify location has proper structure or "Unknown Location"
-            location = result["location"]
-            if location != "Unknown Location":
-                parts = [p.strip() for p in location.split(",")]
-                assert len(parts) in (2, 3), (
-                    f"Location should have 2-3 parts, got {len(parts)}: {location}"
-                )
-                for part in parts:
-                    assert len(part) > 0, "Location parts should not be empty"
-
-    def test_extract_metadata_without_exif(self, db_path):
+    def test_extract_metadata_without_exif(self):
         """Test extract_metadata with an image that has no EXIF data."""
         from photo_meta import extract_metadata
 
-        result = extract_metadata("rust/photo_meta/tests/fixtures/no_exif.jpg", db_path)
+        result = extract_metadata("rust/photo_meta/tests/fixtures/no_exif.jpg")
 
-        # Should have all keys but with None/default values for missing EXIF
-        assert "date_taken" in result
-        assert "lat" in result
-        assert "lon" in result
-        assert "location" in result
+        # Should have all attributes but with None/default values for missing EXIF
+        assert hasattr(result, "timestamp")
+        assert hasattr(result, "lat")
+        assert hasattr(result, "lon")
 
-        # No date or GPS data
-        assert result["date_taken"] is None
-        assert result["lat"] is None
-        assert result["lon"] is None
-        assert result["location"] == "Unknown Location"
+        # No timestamp or GPS data
+        assert result.timestamp is None
+        assert result.lat is None
+        assert result.lon is None
 
-    def test_extract_metadata_with_gps_only(self, db_path):
+    def test_extract_metadata_with_gps_only(self):
         """Test extract_metadata with GPS data but no date."""
         from photo_meta import extract_metadata
 
-        result = extract_metadata(
-            "rust/photo_meta/tests/fixtures/only_gps.jpg", db_path
-        )
+        result = extract_metadata("rust/photo_meta/tests/fixtures/only_gps.jpg")
 
         # Should have GPS but no date
-        assert result["date_taken"] is None
-        assert result["lat"] is not None
-        assert result["lon"] is not None
+        assert result.timestamp is None
+        assert result.lat is not None
+        assert result.lon is not None
 
         # Verify GPS coordinates are valid
-        assert isinstance(result["lat"], float)
-        assert isinstance(result["lon"], float)
-        assert -90.0 <= result["lat"] <= 90.0
-        assert -180.0 <= result["lon"] <= 180.0
+        assert isinstance(result.lat, float)
+        assert isinstance(result.lon, float)
+        assert -90.0 <= result.lat <= 90.0
+        assert -180.0 <= result.lon <= 180.0
 
-    def test_extract_metadata_with_date_only(self, db_path):
+    def test_extract_metadata_with_date_only(self):
         """Test extract_metadata with date but no GPS data."""
         from photo_meta import extract_metadata
 
-        result = extract_metadata(
-            "rust/photo_meta/tests/fixtures/only_date.jpg", db_path
-        )
+        result = extract_metadata("rust/photo_meta/tests/fixtures/only_date.jpg")
 
         # Should have date but no GPS
-        assert result["date_taken"] is not None
-        assert result["lat"] is None
-        assert result["lon"] is None
-        assert result["location"] == "Unknown Location"
+        assert result.timestamp is not None
+        assert result.lat is None
+        assert result.lon is None
 
         # Verify date format is valid RFC3339
         from datetime import datetime
 
-        datetime.fromisoformat(result["date_taken"].replace("Z", "+00:00"))
+        datetime.fromisoformat(result.timestamp.replace("Z", "+00:00"))
