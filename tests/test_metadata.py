@@ -39,6 +39,19 @@ def db_path():
 class TestGetImageInfo:
     """Integration tests for get_image_info wrapper function."""
 
+    @pytest.fixture(autouse=True, scope="class")
+    def enable_metadata_logger_propagation(self, request):
+        import logging
+
+        logger = logging.getLogger("src.core.metadata")
+        old_propagate = logger.propagate
+        logger.propagate = True
+
+        def fin():
+            logger.propagate = old_propagate
+
+        request.addfinalizer(fin)
+
     @pytest.mark.parametrize(
         "scenario",
         ["complete", "date_only", "location_only", "no_exif"],
