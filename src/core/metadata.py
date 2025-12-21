@@ -3,7 +3,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from photo_meta import extract_metadata, reverse_geocode
+from photidy import extract_metadata, reverse_geocode
 from runtime.paths import db_path
 from src.core.image_info import ImageInfo
 from src.utils.constants import SUPPORTED_FORMATS

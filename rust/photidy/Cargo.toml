@@ -1,10 +1,10 @@
 [package]
-name = "photo_meta"
+name = "photidy"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "photo_meta"
+name = "photidy"
 crate-type = ["cdylib"]
 
 [dependencies]

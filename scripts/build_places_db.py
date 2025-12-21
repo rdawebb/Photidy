@@ -16,7 +16,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 DB_VERSION = "0.1"
-OUTPUT_DIR = "rust/photo_meta/data"
+OUTPUT_DIR = "rust/photidy/data"
 OUTPUT_DB = f"places_v{DB_VERSION}.db"
 DATA_SOURCES = "scripts/data"
 

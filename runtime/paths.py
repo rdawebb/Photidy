@@ -23,4 +23,4 @@ def db_path() -> Path:
     Returns:
         Path: The database file path
     """
-    return runtime_root() / "rust" / "photo_meta" / "data" / "places_v0.1.db"
+    return runtime_root() / "rust" / "photidy" / "data" / "places_v0.1.db"

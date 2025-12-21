@@ -1,12 +1,11 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "photidy"
 version = "0.1.0"
 description = "A simple photo organisation tool"
-readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     {name = "Rob Webb", email = "rdawebb@gmail.com"}
@@ -19,3 +18,8 @@ dev = [
     "icecream>=2.1,<3.0",
     "maturin>=1.4,<2.0"
 ]
+
+[tool.maturin]
+module-name = "photidy"
+python-packages = ["src"]
+manifest-path = "rust/photidy/Cargo.toml"

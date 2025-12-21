@@ -26,7 +26,7 @@ pub fn reverse_geocode(lat: f64, lon: f64, db_path: &str) -> Result<Option<Place
 }
 
 #[pymodule]
-fn photo_meta(m: &Bound<PyModule>) -> PyResult<()> {
+fn photidy(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(extract_metadata, m)?)?;
     m.add_function(wrap_pyfunction!(reverse_geocode, m)?)?;
     Ok(())

@@ -221,7 +221,7 @@ class TestOrganisePhotos:
         assert len(summary["failed"]) == 1
         assert summary["failed"][0][1] == "Missing date metadata"
 
-    def test_photo_metadata_error_handling(
+    def test_photidydata_error_handling(
         self, valid_source_dir, valid_dest_dir, suppress_logging
     ):
         """Test handling of PhotoMetadataError during processing."""

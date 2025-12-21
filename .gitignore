@@ -213,4 +213,4 @@ __marimo__/
 scripts/data/
 
 # Generated database
-rust/photo_meta/data/
+rust/photidy/data/
