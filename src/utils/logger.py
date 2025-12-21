@@ -1,14 +1,19 @@
 """Centralised logging setup for the Photidy application."""
 
 import logging
+import os
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
-def get_logger(name: str) -> logging.Logger:
-    """Get a configured logger.
+def get_logger(name: str, log_dir: Path = None) -> logging.Logger:
+    """Get a configured logger with console and file handlers.
+
+    Log files are rotated when they reach 1 MB, with up to 5 backups.
 
     Args:
         name (str): The name of the logger.
+        log_dir (Path, optional): Directory to store log files, defaults to 'logs' in the project root.
 
     Returns:
         logging.Logger: Configured logger instance.
@@ -21,9 +26,17 @@ def get_logger(name: str) -> logging.Logger:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
 
-        log_dir = Path(__file__).parent.parent / "logs"
+        if log_dir is None:
+            env_log_dir = os.getenv("PHOTIDY_LOG_DIR")
+            if env_log_dir:
+                log_dir = Path(env_log_dir)
+            else:
+                log_dir = Path(__file__).parent.parent.parent / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(log_dir / "photidy.log")
+
+        file_handler = RotatingFileHandler(
+            log_dir / "photidy.log", maxBytes=1 * 1024 * 1024, backupCount=5
+        )
         file_handler.setLevel(logging.DEBUG)
 
         formatter = logging.Formatter(
@@ -36,6 +49,7 @@ def get_logger(name: str) -> logging.Logger:
 
         logger.addHandler(console_handler)
         logger.addHandler(file_handler)
+        logger.propagate = False
 
     return logger
 
