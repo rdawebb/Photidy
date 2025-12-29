@@ -26,7 +26,7 @@ class TestExtraction:
             patch("shutil.copyfile") as mock_copyfile,
         ):
             mock_files.return_value.__truediv__.return_value = mock_src
-            extraction.extract_embedded_db(dest)
+            extraction.extract_db(dest)
             mock_copyfile.assert_called_once_with(mock_src, dest)
 
 

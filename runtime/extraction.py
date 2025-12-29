@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 
 
-def extract_embedded_db(dest: Path) -> None:
+def extract_db(dest: Path) -> None:
     """Extract the embedded database to the destination path
 
     Args:

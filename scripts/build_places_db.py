@@ -2,7 +2,6 @@
 
 import csv
 import io
-import math
 import sqlite3
 import sys
 import zipfile
@@ -13,29 +12,24 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from src.utils.errors import DatabaseError
 from src.utils.logger import get_logger
 
+from scripts.constants import (
+    ALLOWED_FEATURE_CODES,
+    ALLCOUNTRIES_ZIP,
+    CITIES_ZIP,
+    CITIES_COLUMNS,
+    COMPILED_CLASS_REGEXES,
+    COMPILED_MISC_REGEXES,
+    DB_VERSION,
+    EXCLUDED_FEATURE_PREFIXES,
+    FAMOUS_PARK_KEYWORDS,
+    FEATURE_CODE_IMPORTANCE,
+    LANDMARKS_COLUMNS,
+    OUTPUT_DB,
+    OUTPUT_DIR,
+    PARK_REGEX,
+)
+
 logger = get_logger(__name__)
-
-DB_VERSION = "0.1"
-OUTPUT_DIR = "rust/photidy/data"
-OUTPUT_DB = f"places_v{DB_VERSION}.db"
-DATA_SOURCES = "scripts/data"
-
-CITIES_ZIP = Path(DATA_SOURCES) / "cities1000.zip"
-ALLCOUNTRIES_ZIP = Path(DATA_SOURCES) / "allCountries.zip"
-
-ALLOWED_FEATURE_CLASSES = {"S", "L", "T"}
-EXCLUDED_FEATURE_PREFIXES = {
-    "S.BLDG",  # buildings
-    "S.SHOP",  # shops
-    "S.OFF",  # offices
-    "S.TRANS",  # transportation
-}
-
-LANDMARK_IMPORTANCE = {
-    "S": 3.0,  # monuments, zoos, sites, etc.
-    "L": 4.0,  # parks, lakes, regions, etc.
-    "T": 4.5,  # terrain (mountains, canyons, etc.)
-}
 
 
 def _ensure_dirs() -> None:
@@ -120,6 +114,128 @@ def _valid_coords(lat, lon) -> bool:
     return -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0
 
 
+def _park_filter(name: str, feature_code: str) -> bool:
+    """Filter parks based on name patterns
+
+    Args:
+        name (str): Name of the park
+        feature_code (str): Feature code
+
+    Returns:
+        bool: True if park should be included, False otherwise
+    """
+    if feature_code == "NPRK":
+        return True
+
+    name_lower = name.lower()
+
+    if "national park" in name_lower:
+        return True
+
+    if any(k in name_lower for k in FAMOUS_PARK_KEYWORDS):
+        return True
+
+    words = name.split()
+    if len(words) >= 2 and not PARK_REGEX.search(name):
+        return True
+
+    return False
+
+
+def _valid_location(name: str, feature_code: str, elevation: int | None) -> bool:
+    """Check if a location is valid based on name and feature attributes
+
+    Args:
+        name (str): Name of the location
+        feature_class (str): Feature class
+        feature_code (str): Feature code
+
+    Returns:
+        bool: True if location is valid, False otherwise
+    """
+    if feature_code not in ALLOWED_FEATURE_CODES:
+        return False
+
+    if any(feature_code.startswith(prefix) for prefix in EXCLUDED_FEATURE_PREFIXES):
+        return False
+
+    if len(name) <= 3 or name.isupper() or name.isdigit():
+        return False
+
+    if feature_code == "PRK":
+        if not _park_filter(name, feature_code):
+            return False
+
+    if feature_code == "MT":
+        if elevation is not None and elevation != "":
+            try:
+                if int(elevation) < 1500:
+                    return False
+            except (ValueError, TypeError):
+                return False
+        else:
+            return False
+
+    class_regex = COMPILED_CLASS_REGEXES.get(feature_code)
+    if class_regex and class_regex.search(name):
+        return False
+
+    for regex in COMPILED_MISC_REGEXES:
+        if regex.search(name):
+            return False
+
+    return True
+
+
+def _city_importance(population: int, feature_code: str) -> float:
+    """Compute importance for a city based on population
+
+    Args:
+        population (int): Population of the city
+        feature_code (str): Feature code
+
+    Returns:
+        float: Importance score
+    """
+    if feature_code == "PPLC":  # capital
+        return 5.0
+    elif feature_code.startswith("PPLA"):  # major city
+        return 4.8
+    elif population >= 10_000_000:
+        return 4.7
+    elif population >= 5_000_000:
+        return 4.6
+    elif population >= 1_000_000:
+        return 4.5
+    elif population >= 250_000:
+        return 4.4
+    elif population >= 50_000:
+        return 4.1
+    elif population >= 10_000:
+        return 3.8
+    else:
+        return 3.4
+
+
+def _park_importance(name: str, feature_code: str) -> float:
+    """Compute importance for a park based on name patterns
+
+    Args:
+        name (str): Name of the park
+        feature_code (str): Feature code
+
+    Returns:
+        float: Importance score
+    """
+    if feature_code == "NPRK":
+        return 4.6
+
+    if any(k in name.lower() for k in FAMOUS_PARK_KEYWORDS):
+        return 4.4
+
+    return 3.8
+
+
 def load_cities(conn) -> None:
     """Load city data from cities1000.zip
 
@@ -141,12 +257,13 @@ def load_cities(conn) -> None:
 
                 for row in reader:
                     try:
-                        name = row[1]
-                        lat = float(row[4])
-                        lon = float(row[5])
-                        country = row[8]
-                        admin = row[10] or None
-                        population = int(row[14] or 0)
+                        name = row[CITIES_COLUMNS["name"]]
+                        lat = float(row[CITIES_COLUMNS["latitude"]])
+                        lon = float(row[CITIES_COLUMNS["longitude"]])
+                        feature_code = row[CITIES_COLUMNS["feature_code"]]
+                        country = row[CITIES_COLUMNS["country"]]
+                        admin = row[CITIES_COLUMNS["admin1"]] or None
+                        population = int(row[CITIES_COLUMNS["population"]] or 0)
                     except (IndexError, ValueError):
                         logger.warning(f"Malformed row in {CITIES_ZIP}: {row}")
                         continue
@@ -155,7 +272,7 @@ def load_cities(conn) -> None:
                         continue
 
                     kind = "city" if population >= 100000 else "town"
-                    importance = math.log10(population) if population > 0 else 0.0
+                    importance = _city_importance(population, feature_code)
 
                     rows.append((name, country, admin, lat, lon, kind, importance))
 
@@ -197,32 +314,27 @@ def load_landmarks(conn) -> None:
 
                 for row in reader:
                     try:
-                        name = row[1]
-                        lat = float(row[4])
-                        lon = float(row[5])
-                        country = row[8]
-                        admin = row[10] or None
-                        feature_class = row[6]
-                        feature_code = row[7]
+                        name = row[LANDMARKS_COLUMNS["name"]]
+                        lat = float(row[LANDMARKS_COLUMNS["latitude"]])
+                        lon = float(row[LANDMARKS_COLUMNS["longitude"]])
+                        country = row[LANDMARKS_COLUMNS["country"]]
+                        admin = row[LANDMARKS_COLUMNS["admin1"]] or None
+                        feature_code = row[LANDMARKS_COLUMNS["feature_code"]]
+                        elevation = row[LANDMARKS_COLUMNS["elevation"]]
                     except (IndexError, ValueError):
                         logger.warning(f"Malformed row in {ALLCOUNTRIES_ZIP}: {row}")
-                        continue
-
-                    if feature_class not in ALLOWED_FEATURE_CLASSES:
-                        continue
-
-                    if any(
-                        feature_code.startswith(prefix)
-                        for prefix in EXCLUDED_FEATURE_PREFIXES
-                    ):
                         continue
 
                     if not _valid_coords(lat, lon):
                         continue
 
-                    importance = LANDMARK_IMPORTANCE.get(feature_class)
-                    if importance is None:
+                    if not _valid_location(name, feature_code, elevation):
                         continue
+
+                    if feature_code == "PRK":
+                        importance = _park_importance(name, feature_code)
+                    else:
+                        importance = FEATURE_CODE_IMPORTANCE.get(feature_code, 3.0)
 
                     rows.append(
                         (name, country, admin, lat, lon, "landmark", importance)
@@ -321,6 +433,8 @@ def main() -> None:
     try:
         _ensure_dirs()
         conn = _connect_db()
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
 
         try:
             _create_schema(conn)

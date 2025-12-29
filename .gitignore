@@ -214,3 +214,6 @@ scripts/data/
 
 # Generated database
 rust/photidy/data/
+
+# Generated logs
+logs/

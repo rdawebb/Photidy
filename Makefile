@@ -22,6 +22,11 @@ help:
 	@echo "Maintenance:"
 	@echo "  make clean                Remove build artifacts and cache"
 	@echo ""
+	@echo "Packaging:"
+	@echo "  make bundle               Bundle application with PyInstaller"
+	@echo ""
+	@echo "Use 'make <command>' to execute a specific command."
+	@echo ""
 
 install:
 	uv sync
@@ -59,3 +64,7 @@ format:
 
 clean:
 	uv run python scripts/clean.py
+
+bundle:
+	pyinstaller pyinstaller/photidy.spec
+	@echo "✓ Application bundled successfully"

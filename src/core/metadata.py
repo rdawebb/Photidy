@@ -3,8 +3,8 @@
 from datetime import datetime
 from pathlib import Path
 
-from photidy import extract_metadata, reverse_geocode
 from runtime.paths import db_path
+from photidy import extract_metadata, reverse_geocode
 from src.core.image_info import ImageInfo
 from src.utils.constants import SUPPORTED_FORMATS
 from src.utils.errors import InvalidPhotoFormatError, PhotoMetadataError
