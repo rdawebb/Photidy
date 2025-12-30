@@ -178,3 +178,41 @@ def error_classes_data():
         (InvalidPhotoFormatError, PhotidyError, "Unsupported format"),
         (InvalidDirectoryError, PhotidyError, "Directory not found"),
     ]
+
+
+@pytest.fixture
+def isolate_state(tmp_path):
+    """Isolate organiser state to a temporary directory for testing.
+
+    This fixture provides a wrapped organise_photos function that automatically
+    uses temporary state and undo log paths, avoiding state pollution.
+    """
+    from src.core.organiser import organise_photos as _organise_photos
+
+    # Create temporary state files
+    temp_state_file = tmp_path / "organiser_state.json"
+    temp_undo_log = tmp_path / "organiser_undo.log"
+
+    def organise_photos_isolated(source_dir, dest_dir):
+        """Wrapper that calls organise_photos with isolated state files."""
+        return _organise_photos(
+            source_dir,
+            dest_dir,
+            state_file=temp_state_file,
+            undo_log=temp_undo_log,
+        )
+
+    def clear_state():
+        """Clear the isolated state files."""
+        if temp_state_file.exists():
+            temp_state_file.unlink()
+        if temp_undo_log.exists():
+            temp_undo_log.unlink()
+
+    # Provide both the wrapper function and state file paths
+    yield {
+        "organise_photos": organise_photos_isolated,
+        "state_file": temp_state_file,
+        "undo_log": temp_undo_log,
+        "clear_state": clear_state,
+    }

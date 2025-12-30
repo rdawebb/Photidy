@@ -22,50 +22,43 @@ class TestGetLogger:
         logger = get_logger("test_module_handlers")
         assert len(logger.handlers) > 0
 
-    def test_logger_has_console_handler(self):
-        """Test that logger has a StreamHandler (console)."""
-        logger = get_logger("test_console")
-        console_handlers = [
-            h for h in logger.handlers if isinstance(h, logging.StreamHandler)
-        ]
-        assert len(console_handlers) > 0
-
-    def test_logger_has_file_handler(self):
-        """Test that logger has a FileHandler."""
-        logger = get_logger("test_file")
-        file_handlers = [
-            h for h in logger.handlers if isinstance(h, logging.FileHandler)
-        ]
-        assert len(file_handlers) > 0
-
     @pytest.mark.parametrize(
-        "handler_type,level_attribute,expected_level",
+        "handler_type,expected_level",
         [
-            ("console", "console", logging.INFO),
-            ("file", "file", logging.DEBUG),
+            ("console", logging.INFO),
+            ("file", logging.DEBUG),
         ],
         ids=["console_info", "file_debug"],
     )
-    def test_handler_levels(self, handler_type, level_attribute, expected_level):
-        """Test that handlers are set to correct levels."""
-        logger_name = f"test_{handler_type}_level_{level_attribute}"
+    def test_logger_handler_configuration(self, handler_type, expected_level):
+        """Test that logger has both console and file handlers with correct levels."""
+        logger_name = f"test_{handler_type}_config"
         logger = get_logger(logger_name)
 
         if handler_type == "console":
+            # Test console handler exists
             console_handlers = [
                 h
                 for h in logger.handlers
                 if isinstance(h, logging.StreamHandler)
                 and not isinstance(h, logging.FileHandler)
             ]
+            assert len(console_handlers) > 0, "Missing console handler"
             if console_handlers:
                 assert console_handlers[0].level == expected_level
+
         elif handler_type == "file":
+            # Test file handler exists
             file_handlers = [
                 h for h in logger.handlers if isinstance(h, logging.FileHandler)
             ]
+            assert len(file_handlers) > 0, "Missing file handler"
             if file_handlers:
                 assert file_handlers[0].level == expected_level
+                # Verify log directory exists
+                log_path = Path(file_handlers[0].baseFilename)
+                assert log_path.parent.exists()
+                assert log_path.parent.name == "logs"
 
     def test_logger_level_is_debug(self):
         """Test that logger itself is set to DEBUG level."""
@@ -97,18 +90,6 @@ class TestGetLogger:
             assert "%(name)s" in handler.formatter._fmt
             assert "%(levelname)s" in handler.formatter._fmt
             assert "%(message)s" in handler.formatter._fmt
-
-    def test_log_directory_is_created(self):
-        """Test that log directory is created."""
-        logger = get_logger("test_log_dir")
-        # Check that a log file handler exists with a valid path
-        file_handlers = [
-            h for h in logger.handlers if isinstance(h, logging.FileHandler)
-        ]
-        if file_handlers:
-            log_path = Path(file_handlers[0].baseFilename)
-            assert log_path.parent.exists()
-            assert log_path.parent.name == "logs"
 
     def test_same_logger_instance_returned(self):
         """Test that multiple calls return the same logger instance."""

@@ -10,6 +10,10 @@ requires-python = ">=3.11"
 authors = [
     {name = "Rob Webb", email = "rdawebb@gmail.com"}
 ]
+dependencies = [
+    "appdirs>=1.4,<2.0",
+    "wxpython>=4.2,<5.0"
+]
 
 [project.optional-dependencies]
 dev = [

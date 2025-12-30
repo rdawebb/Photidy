@@ -1,8 +1,10 @@
 """Organiser module for organising photos based on metadata."""
 
+import json
 import os
 import shutil
 from pathlib import Path
+from typing import Optional
 
 from src.utils.constants import SUPPORTED_FORMATS
 from src.utils.errors import (
@@ -10,19 +12,86 @@ from src.utils.errors import (
     PhotoMetadataError,
     PhotoOrganisationError,
 )
+from src.utils.paths import state_file, undo_log
 from src.utils.logger import get_logger
 
 from .metadata import get_image_info
 
 logger = get_logger(__name__)
 
+STAGING_DIR = ".staging"
 
-def organise_photos(source_dir, dest_dir) -> dict:
+
+def _load_state(state_file_path: Optional[Path] = None) -> dict:
+    """Load the organiser state from a JSON file.
+
+    Args:
+        state_file_path (Path | None): Path to state file. If None, uses default.
+
+    Returns:
+        dict: The loaded state or empty dict if file doesn't exist or error occurs.
+    """
+    if state_file_path is None:
+        state_file_path = state_file
+
+    if state_file_path.exists():
+        try:
+            with open(state_file_path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.error(f"Failed to load state from {state_file_path}: {e}")
+            return {}
+    return {}
+
+
+def _save_state(state: dict, state_file_path: Optional[Path] = None) -> None:
+    """Save the organiser state to a JSON file.
+
+    Args:
+        state (dict): The state to save.
+        state_file_path (Path | None): Path to state file. If None, uses default.
+    """
+    if state_file_path is None:
+        state_file_path = state_file
+
+    try:
+        with open(state_file_path, "w") as f:
+            json.dump(state, f)
+    except (OSError, TypeError) as e:
+        logger.error(f"Failed to save state to {state_file_path}: {e}")
+
+
+def _log_move(src: Path, dest: Path, undo_log_path: Optional[Path] = None) -> None:
+    """Log a file move operation.
+
+    Args:
+        src (Path): Source file path.
+        dest (Path): Destination file path.
+        undo_log_path (Path | None): Path to undo log file. If None, uses default.
+    """
+    if undo_log_path is None:
+        undo_log_path = undo_log
+
+    try:
+        with open(undo_log_path, "a") as f:
+            f.write(f"{src},{dest}\n")
+    except (OSError, TypeError) as e:
+        logger.error(f"Failed to log move for {src} to {dest}: {e}")
+
+
+def organise_photos(
+    source_dir: str,
+    dest_dir: str,
+    state_file: Optional[Path] = None,
+    undo_log: Optional[Path] = None,
+) -> dict:
     """Organise photos from source directory to destination directory based on metadata.
 
     Args:
         source_dir (str): The source directory containing photos.
         dest_dir (str): The destination directory to organise photos into.
+        state_file (Path | None): Path to state file. If None, uses default.
+        undo_log (Path | None): Path to undo log file. If None, uses default.
 
     Returns:
         dict: Summary of the organisation process.
@@ -32,52 +101,96 @@ def organise_photos(source_dir, dest_dir) -> dict:
 
     _validate_directories(source, dest)
 
+    staging_dir = dest / STAGING_DIR
+    try:
+        staging_dir.mkdir(parents=True, exist_ok=True)
+    except (OSError, PermissionError) as e:
+        logger.error(f"Failed to create staging directory: {staging_dir}: {e}")
+        raise PhotoOrganisationError(
+            f"Failed to create staging directory: {staging_dir}"
+        ) from e
+
     logger.info(f"Starting photo organisation from {source} to {dest}")
 
+    state = _load_state(state_file)
     processed = 0
     failed = []
 
     for file_path in source.glob("*"):
+        if not (file_path.is_file() and file_path.suffix.lower() in SUPPORTED_FORMATS):
+            continue
+
+        if file_path.name in state and state[file_path.name] == "processed":
+            logger.debug(f"Skipping already processed file: {file_path.name}")
+            continue
+
         try:
-            if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_FORMATS:
-                logger.debug(f"Processing file: {file_path.name}")
+            logger.debug(f"Processing file: {file_path.name}")
+            image_info = get_image_info(str(file_path))
+            date = image_info.get("date_taken")
+            location = image_info.get("location")
 
-                image_info = get_image_info(str(file_path))
-                date = image_info.get("date_taken")
-                location = image_info.get("location")
+            if not date:
+                logger.warning(f"Missing date for {file_path.name}, skipping.")
+                failed.append((file_path.name, "Missing date metadata"))
+                state[file_path.name] = "failed"
+                _save_state(state, state_file)
+                continue
 
-                if not date:
-                    logger.warning(
-                        f"Missing date metadata for {file_path.name}. Skipping file."
-                    )
-                    failed.append((file_path.name, "Missing date metadata"))
-                    continue
+            year = date.strftime("%Y")
+            month = date.strftime("%m")
+            day = date.strftime("%d")
 
-                year = date.strftime("%Y")
-                month = date.strftime("%m")
-                day = date.strftime("%d")
+            if location and location != "Unknown":
+                target_dir = dest / year / month / day / location
+            else:
+                target_dir = dest / year / month / day
 
-                if location and location != "Unknown":
-                    target_dir = dest / year / month / day / location
-                else:
-                    target_dir = dest / year / month / day
+            target_dir.mkdir(parents=True, exist_ok=True)
+            unique_filename = _get_unique_filename(target_dir, file_path.name)
 
-                target_dir.mkdir(parents=True, exist_ok=True)
+            staged_path = staging_dir / unique_filename
+            try:
+                shutil.move(str(file_path), staged_path)
+            except Exception as e:
+                logger.error(f"Failed to move {file_path.name} to {staged_path}: {e}")
+                failed.append((file_path.name, f"Staging move failed: {e}"))
+                state[file_path.name] = "failed"
+                _save_state(state, state_file)
+                continue
 
-                unique_filename = _get_unique_filename(target_dir, file_path.name)
-
-                shutil.move(str(file_path), target_dir / unique_filename)
-                logger.debug(
-                    f"Moved {file_path.name} to {target_dir / unique_filename}"
-                )
+            final_path = target_dir / unique_filename
+            try:
+                shutil.move(str(staged_path), final_path)
+                logger.debug(f"Moved {file_path.name} to {final_path}")
+                _log_move(str(file_path), str(final_path), undo_log)
+                state[file_path.name] = "processed"
+                _save_state(state, state_file)
                 processed += 1
+            except Exception as e:
+                logger.error(
+                    f"Failed to move {file_path.name} from staging to final: {e}"
+                )
+                failed.append((file_path.name, f"Final move failed: {e}"))
+                state[file_path.name] = "failed"
+                _save_state(state, state_file)
+                try:
+                    shutil.move(str(staged_path), file_path)
+                except Exception as e2:
+                    logger.error(
+                        f"Failed to restore {file_path.name} from staging: {e2}"
+                    )
 
         except PhotoMetadataError as e:
             logger.error(f"Metadata error for {file_path.name}: {e}")
             failed.append((file_path.name, str(e)))
+            state[file_path.name] = "failed"
+            _save_state(state, state_file)
         except Exception as e:
             logger.error(f"Failed to process {file_path.name}: {e}")
             failed.append((file_path.name, str(e)))
+            state[file_path.name] = "failed"
+            _save_state(state, state_file)
 
     summary = {
         "processed": processed,
@@ -93,6 +206,41 @@ def organise_photos(source_dir, dest_dir) -> dict:
             logger.warning(f"Failed: {fname} - Reason: {reason}")
 
     return summary
+
+
+def undo_organisation(undo_log_path: Optional[Path] = None) -> None:
+    """Undo the last organisation operation.
+
+    Args:
+        undo_log_path (Path | None): Path to undo log file. If None, uses default.
+    """
+    if undo_log_path is None:
+        undo_log_path = undo_log
+
+    if not undo_log_path.exists():
+        logger.warning("No undo log found. Nothing to undo.")
+        return
+
+    try:
+        with open(undo_log) as f:
+            moves = [line.strip().split(",", 1) for line in f if "," in line]
+
+        for src, dest in reversed(moves):
+            try:
+                if Path(dest).exists():
+                    Path(src).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(dest, src)
+                    logger.debug(f"Restored {dest} to {src}")
+                else:
+                    logger.warning(f"Destination file {dest} does not exist for undo")
+
+            except Exception as e:
+                logger.error(f"Failed to restore {dest} to {src}: {e}")
+
+        logger.info("Undo operation completed.")
+
+    except Exception as e:
+        logger.error(f"Error during undo operation: {e}")
 
 
 def _validate_directories(source, dest) -> None:

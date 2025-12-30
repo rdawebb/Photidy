@@ -13,9 +13,9 @@ class TestPhotidyIntegration:
     """Integration tests for end-to-end workflows."""
 
     def test_end_to_end_photo_organisation_workflow(
-        self, valid_source_dir, valid_dest_dir, suppress_logging
+        self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
-        """Test complete workflow from source to organized destination."""
+        """Test complete workflow from source to organised destination."""
         photos = [
             ("photo1.jpg", datetime(2024, 1, 15), "New York, New York, US"),
             ("photo2.jpg", datetime(2024, 1, 15), "New York, New York, US"),
@@ -35,7 +35,9 @@ class TestPhotidyIntegration:
         with patch(
             "src.core.organiser.get_image_info", side_effect=mock_get_image_info
         ):
-            summary = organise_photos(str(valid_source_dir), str(valid_dest_dir))
+            summary = isolate_state["organise_photos"](
+                str(valid_source_dir), str(valid_dest_dir)
+            )
 
         # Verify summary
         assert summary["processed"] == 4
@@ -70,7 +72,7 @@ class TestPhotidyIntegration:
         assert (valid_dest_dir / "2024" / "12" / "25" / "photo4.jpg").exists()
 
     def test_directory_structure_creation_matches_expected_pattern(
-        self, valid_source_dir, valid_dest_dir, suppress_logging
+        self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test that directory structure follows expected pattern: YYYY/MM/DD/Location."""
         image_file = valid_source_dir / "photo.jpg"
@@ -82,7 +84,7 @@ class TestPhotidyIntegration:
         }
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            organise_photos(str(valid_source_dir), str(valid_dest_dir))
+            isolate_state["organise_photos"](str(valid_source_dir), str(valid_dest_dir))
 
         # Verify exact directory structure
         expected_path = (
@@ -96,7 +98,7 @@ class TestPhotidyIntegration:
         assert expected_path.exists()
 
     def test_file_movement_and_renaming_verification(
-        self, valid_source_dir, valid_dest_dir, suppress_logging
+        self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test that files are moved (not copied) and renamed correctly."""
         image_file = valid_source_dir / "test_photo.jpg"
@@ -110,15 +112,15 @@ class TestPhotidyIntegration:
         }
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            organise_photos(str(valid_source_dir), str(valid_dest_dir))
+            isolate_state["organise_photos"](str(valid_source_dir), str(valid_dest_dir))
 
         assert not image_file.exists()
 
-        organized_path = valid_dest_dir / "2024" / "05" / "12" / "test_photo.jpg"
-        assert organized_path.exists()
+        organised_path = valid_dest_dir / "2024" / "05" / "12" / "test_photo.jpg"
+        assert organised_path.exists()
 
     def test_summary_accuracy_with_various_photo_sets(
-        self, valid_source_dir, valid_dest_dir, suppress_logging
+        self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test summary accuracy with mixed scenarios."""
         valid_file = valid_source_dir / "valid.jpg"
@@ -144,7 +146,9 @@ class TestPhotidyIntegration:
         with patch(
             "src.core.organiser.get_image_info", side_effect=mock_get_image_info
         ):
-            summary = organise_photos(str(valid_source_dir), str(valid_dest_dir))
+            summary = isolate_state["organise_photos"](
+                str(valid_source_dir), str(valid_dest_dir)
+            )
 
         assert summary["processed"] == 1
         assert len(summary["failed"]) == 2
@@ -170,9 +174,9 @@ class TestPhotidyIntegration:
             organise_photos(str(valid_source_dir), str(bad_dest))
 
     def test_large_batch_photo_organisation(
-        self, valid_source_dir, valid_dest_dir, suppress_logging
+        self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
-        """Test organizing a large batch of photos."""
+        """Test organising a large batch of photos."""
         from pathlib import Path
 
         for i in range(20):
@@ -199,7 +203,9 @@ class TestPhotidyIntegration:
         with patch(
             "src.core.organiser.get_image_info", side_effect=mock_get_image_info
         ):
-            summary = organise_photos(str(valid_source_dir), str(valid_dest_dir))
+            summary = isolate_state["organise_photos"](
+                str(valid_source_dir), str(valid_dest_dir)
+            )
 
         assert summary["processed"] == 20
         assert summary["failed"] == []
@@ -209,9 +215,9 @@ class TestPhotidyIntegration:
         assert len(list(valid_source_dir.glob("*"))) == 0
 
     def test_organisation_with_duplicate_filenames(
-        self, valid_source_dir, valid_dest_dir, suppress_logging
+        self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
-        """Test organizing photos with duplicate filenames but different content."""
+        """Test organising photos with duplicate filenames but different content."""
         file1 = valid_source_dir / "vacation.jpg"
         file1.write_text("fake image 1")
 
@@ -221,16 +227,23 @@ class TestPhotidyIntegration:
         }
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            summary1 = organise_photos(str(valid_source_dir), str(valid_dest_dir))
+            summary1 = isolate_state["organise_photos"](
+                str(valid_source_dir), str(valid_dest_dir)
+            )
 
         assert summary1["processed"] == 1
+
+        # Clear state to allow reprocessing of files with same name
+        isolate_state["clear_state"]()
 
         # Create another file with same name
         file2 = valid_source_dir / "vacation.jpg"
         file2.write_text("fake image 2")
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            summary2 = organise_photos(str(valid_source_dir), str(valid_dest_dir))
+            summary2 = isolate_state["organise_photos"](
+                str(valid_source_dir), str(valid_dest_dir)
+            )
 
         assert summary2["processed"] == 1
 

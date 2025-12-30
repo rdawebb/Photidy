@@ -15,13 +15,13 @@ class TestCustomErrors:
     """Test custom exception behavior."""
 
     @pytest.mark.parametrize(
-        "error_class,message",
+        "error_class,message,parent_class",
         [
-            (PhotidyError, "Test error message"),
-            (PhotoOrganisationError, "Organisation failed"),
-            (PhotoMetadataError, "Metadata extraction failed"),
-            (InvalidPhotoFormatError, "Unsupported format"),
-            (InvalidDirectoryError, "Directory not found"),
+            (PhotidyError, "Test error message", Exception),
+            (PhotoOrganisationError, "Organisation failed", PhotidyError),
+            (PhotoMetadataError, "Metadata extraction failed", PhotidyError),
+            (InvalidPhotoFormatError, "Unsupported format", PhotidyError),
+            (InvalidDirectoryError, "Directory not found", PhotidyError),
         ],
         ids=[
             "PhotidyError",
@@ -31,73 +31,25 @@ class TestCustomErrors:
             "InvalidDirectoryError",
         ],
     )
-    def test_error_instantiation(self, error_class, message):
-        """Test that custom errors can be instantiated with messages."""
+    def test_error_instantiation_and_inheritance(
+        self, error_class, message, parent_class
+    ):
+        """Test error instantiation, message handling, and inheritance."""
+        # Test instantiation
         error = error_class(message)
         assert str(error) == message
 
-    @pytest.mark.parametrize(
-        "error_class,parent_class",
-        [
-            (PhotidyError, Exception),
-            (PhotoOrganisationError, PhotidyError),
-            (PhotoMetadataError, PhotidyError),
-            (InvalidPhotoFormatError, PhotidyError),
-            (InvalidDirectoryError, PhotidyError),
-        ],
-        ids=[
-            "PhotidyError",
-            "PhotoOrganisationError",
-            "PhotoMetadataError",
-            "InvalidPhotoFormatError",
-            "InvalidDirectoryError",
-        ],
-    )
-    def test_error_inheritance(self, error_class, parent_class):
-        """Test that custom errors inherit correctly."""
+        # Test inheritance
         assert issubclass(error_class, parent_class)
 
-    @pytest.mark.parametrize(
-        "error_class",
-        [
-            PhotidyError,
-            PhotoOrganisationError,
-            PhotoMetadataError,
-            InvalidPhotoFormatError,
-            InvalidDirectoryError,
-        ],
-        ids=[
-            "PhotidyError",
-            "PhotoOrganisationError",
-            "PhotoMetadataError",
-            "InvalidPhotoFormatError",
-            "InvalidDirectoryError",
-        ],
-    )
-    def test_error_can_be_raised_and_caught(self, error_class):
-        """Test that custom errors can be raised and caught."""
+        # Test raising and catching
         with pytest.raises(error_class):
             raise error_class("Test")
 
-    @pytest.mark.parametrize(
-        "error_class,parent_class",
-        [
-            (PhotoOrganisationError, PhotidyError),
-            (PhotoMetadataError, PhotidyError),
-            (InvalidPhotoFormatError, PhotidyError),
-            (InvalidDirectoryError, PhotidyError),
-        ],
-        ids=[
-            "PhotoOrganisationError",
-            "PhotoMetadataError",
-            "InvalidPhotoFormatError",
-            "InvalidDirectoryError",
-        ],
-    )
-    def test_error_caught_as_parent_class(self, error_class, parent_class):
-        """Test that custom errors can be caught as parent class."""
-        with pytest.raises(parent_class):
-            raise error_class("Test")
+        # Test catching as parent class (except for PhotidyError which has no parent with PhotidyError)
+        if error_class != PhotidyError:
+            with pytest.raises(parent_class):
+                raise error_class("Test")
 
 
 class TestPhotidyErrorBase:

@@ -25,6 +25,9 @@ help:
 	@echo "Packaging:"
 	@echo "  make bundle               Bundle application with PyInstaller"
 	@echo ""
+	@echo "Running:"
+	@echo "  make run                  Run the application"
+	@echo ""
 	@echo "Use 'make <command>' to execute a specific command."
 	@echo ""
 
@@ -68,3 +71,6 @@ clean:
 bundle:
 	pyinstaller pyinstaller/photidy.spec
 	@echo "✓ Application bundled successfully"
+
+run:
+	uv run python -m src.ui.main

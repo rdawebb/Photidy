@@ -147,72 +147,56 @@ class TestGetImageInfo:
                 info = get_image_info("test.JPG")
                 assert info is not None
 
-    def test_logging_success_with_date(self, metadata_scenarios, caplog):
-        """Test that successful extraction with date is logged."""
-        scenario_data = metadata_scenarios["date_only"]
-        mock_rust_metadata = create_mock_extracted_metadata(
-            timestamp=scenario_data["timestamp"],
-            lat=scenario_data["lat"],
-            lon=scenario_data["lon"],
-        )
-        with patch(
-            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
-        ):
-            with patch("src.core.metadata.reverse_geocode", return_value=None):
-                get_image_info("test.jpg")
-                assert "Extracted date info" in caplog.text
-
-    def test_logging_success_with_location(self, metadata_scenarios, caplog):
-        """Test that successful location extraction is logged."""
-        scenario_data = metadata_scenarios["location_only"]
-        mock_rust_metadata = create_mock_extracted_metadata(
-            timestamp=scenario_data["timestamp"],
-            lat=scenario_data["lat"],
-            lon=scenario_data["lon"],
-        )
-        mock_place = create_mock_place(scenario_data["location"])
-        with patch(
-            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
-        ):
-            with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
-                get_image_info("test.jpg")
-                assert "Extracted location info" in caplog.text
-
-    def test_logging_warning_no_date(self, metadata_scenarios, caplog):
-        """Test that missing date is logged as warning."""
-        scenario_data = metadata_scenarios["no_exif"]
-        mock_rust_metadata = create_mock_extracted_metadata(
-            timestamp=scenario_data["timestamp"],
-            lat=scenario_data["lat"],
-            lon=scenario_data["lon"],
-        )
-        with patch(
-            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
-        ):
-            with patch("src.core.metadata.reverse_geocode", return_value=None):
-                get_image_info("test.jpg")
-                assert "No timestamp found" in caplog.text
-
-    def test_logging_warning_no_location(self, metadata_scenarios, caplog):
-        """Test that missing location is logged."""
-        scenario_data = metadata_scenarios["date_only"]
-        mock_rust_metadata = create_mock_extracted_metadata(
-            timestamp=scenario_data["timestamp"],
-            lat=scenario_data["lat"],
-            lon=scenario_data["lon"],
-        )
-        with patch(
-            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
-        ):
-            with patch("src.core.metadata.reverse_geocode", return_value=None):
-                get_image_info("test.jpg")
-                assert "No location found" in caplog.text
-
     def test_logging_error_invalid_format(self, caplog):
         """Test that invalid file format is logged as error."""
         with pytest.raises(InvalidPhotoFormatError):
             get_image_info("test.txt")
         assert "Unsupported file format" in caplog.text
+
+    @pytest.mark.parametrize(
+        "scenario,expected_log_message,should_contain",
+        [
+            ("complete", "Extracted date info", True),
+            ("complete", "Extracted location info", True),
+            ("date_only", "Extracted date info", True),
+            ("date_only", "No location found", True),
+            ("location_only", "Extracted location info", True),
+            ("location_only", "No timestamp found", True),
+            ("no_exif", "No timestamp found", True),
+        ],
+        ids=[
+            "date_logged",
+            "location_logged",
+            "date_only_has_date",
+            "date_only_no_location",
+            "location_only_has_location",
+            "location_only_no_date",
+            "no_exif_warning",
+        ],
+    )
+    def test_logging_messages_for_metadata_scenarios(
+        self, metadata_scenarios, scenario, expected_log_message, should_contain, caplog
+    ):
+        """Test that metadata extraction logs appropriate messages for various scenarios."""
+        scenario_data = metadata_scenarios[scenario]
+
+        mock_rust_metadata = create_mock_extracted_metadata(
+            timestamp=scenario_data["timestamp"],
+            lat=scenario_data["lat"],
+            lon=scenario_data["lon"],
+        )
+
+        mock_place = None
+        if scenario_data["location"] != "Unknown Location":
+            mock_place = create_mock_place(scenario_data["location"])
+
+        with patch(
+            "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
+        ):
+            with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
+                get_image_info("test.jpg")
+                if should_contain:
+                    assert expected_log_message in caplog.text
 
     def test_returns_rust_result_unchanged(self, suppress_logging):
         """Test that the function correctly constructs ImageInfo from Rust data."""
