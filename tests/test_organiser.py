@@ -608,25 +608,18 @@ class TestOrganisePhotosDefaultPaths:
             "location": "New York, New York, US",
         }
 
-        # Make destination read-only to prevent staging dir creation
-        import os
-        import stat
-
-        original_mode = os.stat(str(valid_dest_dir)).st_mode
-        try:
-            os.chmod(str(valid_dest_dir), stat.S_IRUSR | stat.S_IXUSR)
-
+        # Mock Path.mkdir to raise Error when called
+        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
             with patch(
-                "src.core.organiser.get_image_info", return_value=mock_image_info
+                "pathlib.Path.mkdir", side_effect=PermissionError("No permission")
             ):
                 with pytest.raises(
-                    PhotoOrganisationError, match="Failed to create staging directory"
+                    InvalidDirectoryError,
+                    match="Failed to create destination directory",
                 ):
                     isolate_state["organise_photos"](
                         str(valid_source_dir), str(valid_dest_dir)
                     )
-        finally:
-            os.chmod(str(valid_dest_dir), original_mode)
 
     def test_undo_no_log_file(self, tmp_path, suppress_logging):
         """Test undo_organisation when no log file exists."""
@@ -822,26 +815,20 @@ class TestOrganisePhotosDefaultPaths:
         """Test handling of permission errors in state/log operations."""
         from src.core.organiser import _save_state, _log_move
 
-        # Create a read-only directory
-        read_only_dir = tmp_path / "readonly"
-        read_only_dir.mkdir()
-        os.chmod(str(read_only_dir), 0o555)
-
-        try:
-            if permission_error_type == "save_state":
-                state_file = read_only_dir / "state.json"
-                # _save_state should log error and not raise
+        if permission_error_type == "save_state":
+            state_file = tmp_path / "state.json"
+            # Mock open to raise PermissionError
+            with patch("builtins.open", side_effect=PermissionError("No permission")):
                 _save_state({"test": "data"}, state_file)
-                # Should not have created file due to permission error
-                assert not state_file.exists()
-            else:  # log_move
-                undo_log = read_only_dir / "undo.log"
-                # _log_move should log error and not raise
+            # File should not exist
+            assert not state_file.exists()
+        else:
+            undo_log = tmp_path / "undo.log"
+            # Mock open to raise PermissionError
+            with patch("builtins.open", side_effect=PermissionError("No permission")):
                 _log_move(Path("src.txt"), Path("dst.txt"), undo_log)
-                # Should not have created file due to permission error
-                assert not undo_log.exists()
-        finally:
-            os.chmod(str(read_only_dir), 0o755)
+            # File should not exist
+            assert not undo_log.exists()
 
     @pytest.mark.parametrize(
         "error_type,mock_patch",
