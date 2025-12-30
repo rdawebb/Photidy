@@ -1,16 +1,21 @@
 """Main GUI entry point"""
 
-import wx
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QCoreApplication
 
-from src.ui.frame_main import MainWindow
+from src.ui.main_window import MainWindow
 
 
 def main():
-    app = wx.App()
-    frame = MainWindow()
-    frame.Show()
-    app.SetTopWindow(frame)
-    app.MainLoop()
+    app = QApplication([])
+
+    # Set application metadata (used for menus on macOS)
+    QCoreApplication.setApplicationName("Photidy")
+    QCoreApplication.setApplicationVersion("0.1.0")
+
+    main_window = MainWindow()
+    main_window.show()
+    app.exec()
 
 
 if __name__ == "__main__":
