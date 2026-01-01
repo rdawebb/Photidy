@@ -12,8 +12,8 @@ from src.utils.errors import (
     PhotoMetadataError,
     PhotoOrganisationError,
 )
-from src.utils.paths import state_file, undo_log
 from src.utils.logger import get_logger
+from src.utils.paths import state_file, undo_log
 
 from .metadata import get_image_info
 
@@ -79,11 +79,64 @@ def _log_move(src: Path, dest: Path, undo_log_path: Optional[Path] = None) -> No
         logger.error(f"Failed to log move for {src} to {dest}: {e}")
 
 
+def scan_directory(source_dir: str) -> dict:
+    """Scan the directory for photos and return a summary, including list of photo files.
+
+    Args:
+        source_dir (str): The source directory to scan.
+
+    Returns:
+        dict: A summary of the scan results
+    """
+    source = Path(source_dir)
+
+    _validate_directories(source)
+
+    logger.debug(f"Scanning directory: {source}")
+
+    photo_files = []
+    non_photo_count = 0
+    inaccessible_count = 0
+
+    try:
+        for file_path in source.rglob("*"):
+            try:
+                if not file_path.is_file():
+                    continue
+
+                if file_path.suffix.lower() in SUPPORTED_FORMATS:
+                    photo_files.append(file_path)
+                else:
+                    non_photo_count += 1
+
+            except (OSError, PermissionError) as e:
+                logger.warning(f"Error accessing file {file_path}: {e}")
+                inaccessible_count += 1
+                continue
+
+    except Exception as e:
+        logger.error(f"Error scanning directory {source}: {e}")
+        raise PhotoOrganisationError(f"Error scanning directory {source}: {e}") from e
+
+    logger.debug(
+        f"Found {len(photo_files)} photos, {non_photo_count} non-photos, and {inaccessible_count} inaccessible files."
+    )
+
+    return {
+        "photo_count": len(photo_files),
+        "non_photo_count": non_photo_count,
+        "total_files": len(photo_files) + non_photo_count + inaccessible_count,
+        "photo_files": photo_files,
+        "inaccessible_count": inaccessible_count,
+    }
+
+
 def organise_photos(
     source_dir: str,
     dest_dir: str,
     state_file: Optional[Path] = None,
     undo_log: Optional[Path] = None,
+    photo_files: list[Path] | None = None,
 ) -> dict:
     """Organise photos from source directory to destination directory based on metadata.
 
@@ -92,6 +145,7 @@ def organise_photos(
         dest_dir (str): The destination directory to organise photos into.
         state_file (Path | None): Path to state file. If None, uses default.
         undo_log (Path | None): Path to undo log file. If None, uses default.
+        photo_files (list[Path] | None): List of photo files to organise. If None, scans source_dir.
 
     Returns:
         dict: Summary of the organisation process.
@@ -100,6 +154,11 @@ def organise_photos(
     dest = Path(dest_dir)
 
     _validate_directories(source, dest)
+
+    if photo_files is None:
+        files_to_process = scan_directory(source_dir)["photo_files"]
+    else:
+        files_to_process = photo_files
 
     staging_dir = dest / STAGING_DIR
     try:
@@ -116,7 +175,7 @@ def organise_photos(
     processed = 0
     failed = []
 
-    for file_path in source.glob("*"):
+    for file_path in files_to_process:
         if not (file_path.is_file() and file_path.suffix.lower() in SUPPORTED_FORMATS):
             continue
 
@@ -243,12 +302,12 @@ def undo_organisation(undo_log_path: Optional[Path] = None) -> None:
         logger.error(f"Error during undo operation: {e}")
 
 
-def _validate_directories(source, dest) -> None:
+def _validate_directories(source, dest: Optional[Path] = None) -> None:
     """Validate source and destination directories.
 
     Args:
         source (Path): The source directory.
-        dest (Path): The destination directory.
+        dest (Path | None): The destination directory. If None, only source is validated.
 
     Raises:
         InvalidDirectoryError: If either directory is invalid or inaccessible.
@@ -260,14 +319,17 @@ def _validate_directories(source, dest) -> None:
     if not os.access(source, os.R_OK):
         raise InvalidDirectoryError(f"Source directory is not readable: {source}")
 
-    try:
-        dest.mkdir(parents=True, exist_ok=True)
-    except (OSError, PermissionError) as e:
-        raise InvalidDirectoryError(
-            f"Failed to create destination directory: {dest}"
-        ) from e
+    if dest is not None:
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+        except (OSError, PermissionError) as e:
+            raise InvalidDirectoryError(
+                f"Failed to create destination directory: {dest}"
+            ) from e
 
-    logger.debug(f"Validated directories - source: {source}, destination: {dest}")
+        logger.debug(f"Validated directories - source: {source}, destination: {dest}")
+    else:
+        logger.debug(f"Validated source directory: {source}")
 
 
 def _get_unique_filename(directory, filename) -> str:

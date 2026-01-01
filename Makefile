@@ -74,3 +74,6 @@ bundle:
 
 run:
 	uv run python -m src.ui.main
+
+run-cli:
+	uv run python -m src.cli.cli

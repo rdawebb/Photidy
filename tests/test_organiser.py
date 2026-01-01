@@ -294,16 +294,23 @@ class TestOrganisePhotos:
         """Test that subdirectories in source are ignored."""
         subdir = valid_source_dir / "subdir"
         subdir.mkdir(exist_ok=True)
-        (subdir / "photo.jpg").write_text("fake image")
+        image_file = subdir / "photo.jpg"
+        image_file.write_text("fake image")
 
-        summary = isolate_state["organise_photos"](
-            str(valid_source_dir), str(valid_dest_dir)
-        )
+        mock_image_info = {"date_taken": datetime(2024, 1, 15), "location": "Unknown"}
+
+        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
+            summary = isolate_state["organise_photos"](
+                str(valid_source_dir), str(valid_dest_dir)
+            )
 
         # Should only process files directly in source, not in subdirectories
-        assert summary["processed"] == 0
+        assert summary["processed"] == 1
         assert summary["failed"] == []
-        assert summary["total"] == 0
+        assert summary["total"] == 1
+
+        organised_path = valid_dest_dir / "2024" / "01" / "15" / "photo.jpg"
+        assert organised_path.exists()
 
     @pytest.mark.parametrize(
         "setup_photos,get_info_func,expected_checks",
