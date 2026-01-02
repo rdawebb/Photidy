@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import typer
+from rich import box
 from rich.console import Console
 from rich.table import Table
 
@@ -35,12 +36,20 @@ def display_scan_results(summary: dict) -> None:
     Args:
         summary (dict): The summary dictionary containing scan results.
     """
-    table = Table(title="Scan Results", title_style="green")
-    table.add_column("Category", justify="left", style="cyan", no_wrap=True)
-    table.add_column("Count", justify="right", style="magenta")
+    table = Table(
+        title="Scan Results",
+        title_style="green",
+        box=box.ASCII,
+        show_header=False,
+        width=40,
+    )
+    table.add_column(None, justify="left", style="cyan", no_wrap=True)
+    table.add_column(None, justify="right", style="magenta")
 
     for category, count in summary.items():
-        if category == "photo_files":
+        if category == "photo_files" or (
+            category == "inaccessible_count" and count == 0
+        ):
             continue
         c = category.replace("_", " ").replace("count", "").title()
         table.add_row(c, str(count))

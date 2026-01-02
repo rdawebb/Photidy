@@ -88,44 +88,54 @@ def scan_directory(source_dir: str) -> dict:
     Returns:
         dict: A summary of the scan results
     """
-    source = Path(source_dir)
+    source_dir = Path(source_dir)
 
-    _validate_directories(source)
+    _validate_directories(source_dir)
 
-    logger.debug(f"Scanning directory: {source}")
+    logger.debug(f"Scanning directory: {source_dir}")
 
     photo_files = []
-    non_photo_count = 0
+    other_count = 0
     inaccessible_count = 0
 
+    def _scan(dir: Path) -> None:
+        nonlocal other_count, inaccessible_count
+        try:
+            with os.scandir(dir) as entries:
+                for entry in entries:
+                    if entry.is_file():
+                        try:
+                            if entry.name.lower().endswith(SUPPORTED_FORMATS):
+                                photo_files.append(Path(entry.path))
+                            else:
+                                other_count += 1
+                        except (OSError, PermissionError) as e:
+                            logger.warning(f"Error processing file {entry.path}: {e}")
+                            inaccessible_count += 1
+                    elif entry.is_dir():
+                        _scan(entry.path)
+
+        except (OSError, PermissionError) as e:
+            logger.error(f"Error scanning directory {dir}: {e}")
+            inaccessible_count += 1
+
     try:
-        for file_path in source.rglob("*"):
-            try:
-                if not file_path.is_file():
-                    continue
-
-                if file_path.suffix.lower() in SUPPORTED_FORMATS:
-                    photo_files.append(file_path)
-                else:
-                    non_photo_count += 1
-
-            except (OSError, PermissionError) as e:
-                logger.warning(f"Error accessing file {file_path}: {e}")
-                inaccessible_count += 1
-                continue
+        _scan(source_dir)
 
     except Exception as e:
-        logger.error(f"Error scanning directory {source}: {e}")
-        raise PhotoOrganisationError(f"Error scanning directory {source}: {e}") from e
+        logger.error(f"Error scanning directory {source_dir}: {e}")
+        raise PhotoOrganisationError(
+            f"Error scanning directory {source_dir}: {e}"
+        ) from e
 
     logger.debug(
-        f"Found {len(photo_files)} photos, {non_photo_count} non-photos, and {inaccessible_count} inaccessible files."
+        f"Found {len(photo_files)} photos, {other_count} other files, and {inaccessible_count} inaccessible files."
     )
 
     return {
-        "photo_count": len(photo_files),
-        "non_photo_count": non_photo_count,
-        "total_files": len(photo_files) + non_photo_count + inaccessible_count,
+        "photos_count": len(photo_files),
+        "other_count": other_count,
+        "total_files": len(photo_files) + other_count + inaccessible_count,
         "photo_files": photo_files,
         "inaccessible_count": inaccessible_count,
     }
@@ -302,7 +312,7 @@ def undo_organisation(undo_log_path: Optional[Path] = None) -> None:
         logger.error(f"Error during undo operation: {e}")
 
 
-def _validate_directories(source, dest: Optional[Path] = None) -> None:
+def _validate_directories(source: Path, dest: Optional[Path] = None) -> None:
     """Validate source and destination directories.
 
     Args:
