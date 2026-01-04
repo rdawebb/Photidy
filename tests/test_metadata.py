@@ -28,14 +28,6 @@ def create_mock_place(name="Unknown Location"):
     return mock
 
 
-@pytest.fixture
-def db_path():
-    """Fixture that provides the embedded database path for tests."""
-    from runtime.paths import db_path
-
-    return db_path()
-
-
 class TestGetImageInfo:
     """Integration tests for get_image_info wrapper function."""
 
@@ -175,7 +167,12 @@ class TestGetImageInfo:
         ],
     )
     def test_logging_messages_for_metadata_scenarios(
-        self, metadata_scenarios, scenario, expected_log_message, should_contain, caplog
+        self,
+        metadata_scenarios,
+        scenario,
+        expected_log_message,
+        should_contain,
+        caplog,
     ):
         """Test that metadata extraction logs appropriate messages for various scenarios."""
         scenario_data = metadata_scenarios[scenario]

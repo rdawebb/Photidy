@@ -2,9 +2,35 @@
 
 import logging
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
+
+
+_temp_db_path = None
+
+
+def pytest_configure(config):
+    """Pytest hook to configure test environment before tests run"""
+    import tempfile
+
+    global _temp_db_path
+
+    temp_dir = tempfile.mkdtemp()
+    db_file_path = f"{temp_dir}/places_v0.1.db"
+
+    with open(db_file_path, "wb") as f:
+        f.write(b"mock database content")
+
+    _temp_db_path = db_file_path
+
+    def mock_db_path_func():
+        from pathlib import Path
+
+        return Path(_temp_db_path)
+
+    patcher = patch("runtime.paths.db_path", side_effect=mock_db_path_func)
+    patcher.start()
 
 
 @pytest.fixture
@@ -86,6 +112,20 @@ def suppress_logging():
     logging.getLogger("src.core.metadata").setLevel(logging.DEBUG)
     logging.getLogger("src.core.organiser").setLevel(logging.DEBUG)
     logging.getLogger("src.utils.logger").setLevel(logging.DEBUG)
+
+
+@pytest.fixture
+def mock_db_path(tmp_path):
+    """Fixture that mocks the database path to return a temporary file.
+
+    Note: This fixture is for cases where you need a fresh temporary database.
+    By default, db_path is already patched globally via pytest_configure hook.
+    """
+    db_file = tmp_path / "places_v0.1.db"
+    db_file.write_bytes(b"mock database content")
+
+    with patch("runtime.paths.db_path", return_value=db_file):
+        yield db_file
 
 
 @pytest.fixture
