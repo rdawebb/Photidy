@@ -123,9 +123,7 @@ mod tests {
 
     #[test]
     fn test_assert_compatible_patch_difference() {
-        // Database with 0.1.0 should be compatible with crate 0.1.1
-        let conn = setup_test_db_with_version("0.1.0");
-        // We'll simulate this by checking the logic works
+        // Simulate patch version difference, should be compatible
         assert_eq!(get_major_minor("0.1.0"), get_major_minor("0.1.1"));
     }
 
