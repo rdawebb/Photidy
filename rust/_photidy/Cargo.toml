@@ -1,0 +1,19 @@
+[package]
+name = "photidy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "_photidy"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.27.2", features = ["extension-module"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+kamadak-exif = "0.6.1"
+once_cell = "1.19"
+serde = { version = "1.0", features = ["derive"] }
+chrono = "0.4"
+
+[dev-dependencies]
+tempfile = "3"

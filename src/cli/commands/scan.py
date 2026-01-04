@@ -3,15 +3,16 @@
 import typer
 from rich.console import Console
 
-from ..utils import display_scan_results, validate_and_expand_path
 from src.core.organiser import scan_directory
-from src.utils.errors import InvalidDirectoryError
+from src.utils.errors import InvalidDirectoryError, PhotoOrganisationError
+
+from ..utils import display_scan_results, save_last_scan, validate_and_expand_path
 
 console = Console()
 
 
-def scan(directory: str) -> list:
-    """Scan a directory for photos and display the results
+def scan_cmd(directory: str) -> None:
+    """Scan a directory for photos, display the results, and save to a cache file.
 
     Args:
         directory (str): The directory to scan for photos.
@@ -31,16 +32,20 @@ def scan(directory: str) -> list:
             console.print(
                 "\n[bold yellow]Scan complete - no photos found[/bold yellow]\n"
             )
-            return []
+            save_last_scan(directory, [])
         else:
             console.print(
                 f"\n[bold green]Scan complete - {photo_count} photos found![/bold green]\n"
             )
-            return photo_files
+
+        save_last_scan(directory, photo_files)
 
     except InvalidDirectoryError as e:
-        console.print(f"[red]Error: [/red] {e}")
+        console.print(f"\n[red]Directory error: [/red] {e}")
+        raise typer.Exit(code=1)
+    except PhotoOrganisationError as e:
+        console.print(f"\n[red]Organisation error: [/red] {e}")
         raise typer.Exit(code=1)
     except Exception as e:
-        console.print(f"[red]Unexpected error: [/red] {e}")
+        console.print(f"\n[red]Unexpected error: [/red] {e}")
         raise typer.Exit(code=1)

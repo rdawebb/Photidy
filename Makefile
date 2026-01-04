@@ -1,4 +1,4 @@
-.PHONY: help build-rust test test-rust test-rust-unit test-rust-integration test-fast coverage cov-python clean lint format install
+.PHONY: help build-rust test test-rust test-rust-unit test-rust-integration test-python coverage cov-python clean lint format install
 
 help:
 	@echo "Photidy Development Commands"
@@ -12,7 +12,7 @@ help:
 	@echo "Testing:"
 	@echo "  make test                 Run all tests (Rust + Python)"
 	@echo "  make test-rust            Run all Rust unit tests"
-	@echo "  make test-fast            Run Python tests only (without Rust)"
+	@echo "  make test-python            Run Python tests only (without Rust)"
 	@echo "  make cov-python           Run Python tests with coverage report"
 	@echo ""
 	@echo "Code Quality:"
@@ -32,7 +32,7 @@ help:
 	@echo ""
 
 install:
-	uv sync
+	uv pip install -e .
 
 install-dev:
 	uv sync --all-extras
@@ -52,8 +52,8 @@ test: build-rust test-rust
 	@echo ""
 	@echo "✓ All tests completed successfully"
 
-test-fast:
-	uv run pytest -v --no-cov || uv run pytest -v
+test-python:
+	uv run pytest -v --no-cov
 
 cov-python: build-rust
 	uv run pytest --cov=src --cov-report=html --cov-report=term

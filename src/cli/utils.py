@@ -1,11 +1,14 @@
 """CLI utilities for Photidy"""
 
+import json
 from pathlib import Path
 
 import typer
 from rich import box
 from rich.console import Console
 from rich.table import Table
+
+from src.utils.paths import scan_cache
 
 console = Console()
 
@@ -47,11 +50,44 @@ def display_scan_results(summary: dict) -> None:
     table.add_column(None, justify="right", style="magenta")
 
     for category, count in summary.items():
-        if category == "photo_files" or (
-            category == "inaccessible_count" and count == 0
+        if (
+            category == "photo_files"
+            or (category == "inaccessible_count" and count == 0)
+            or (category == "other_count" and count == 0)
         ):
             continue
         c = category.replace("_", " ").replace("count", "").title()
         table.add_row(c, str(count))
 
     console.print(table)
+
+
+def save_last_scan(directory: str, photo_files: list) -> None:
+    """Save the last scan results to a file.
+
+    Args:
+        directory (str): The directory that was scanned.
+        photo_files (list): The list of photo files found in the scan.
+    """
+    try:
+        path_strings = [str(p) for p in photo_files]
+        with open(scan_cache, "w") as f:
+            json.dump({"directory": directory, "photo_files": path_strings}, f)
+    except Exception as e:
+        console.print(f"[red]Error saving scan results: [/red] {e}")
+
+
+def load_last_scan() -> dict:
+    """Load the last scan results from a file.
+
+    Returns:
+        dict: The last scan results, including the directory and photo files.
+    """
+    try:
+        with open(scan_cache, "r") as f:
+            data = json.load(f)
+        data["photo_files"] = [Path(p) for p in data.get("photo_files", [])]
+        return data
+    except Exception as e:
+        console.print(f"[red]Error loading scan results: [/red] {e}")
+        return {}

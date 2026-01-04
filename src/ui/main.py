@@ -1,7 +1,8 @@
 """Main GUI entry point"""
 
+import sys
+
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QCoreApplication
 
 from src.ui.main_window import MainWindow
 
@@ -9,13 +10,16 @@ from src.ui.main_window import MainWindow
 def main():
     app = QApplication([])
 
-    # Set application metadata (used for menus on macOS)
-    QCoreApplication.setApplicationName("Photidy")
-    QCoreApplication.setApplicationVersion("0.1.0")
+    app.setStyle("Fusion")
+
+    # Set application metadata
+    app.setApplicationName("Photidy")
+    app.setApplicationVersion("0.1.0")
 
     main_window = MainWindow()
     main_window.show()
-    app.exec()
+
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

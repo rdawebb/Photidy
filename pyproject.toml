@@ -29,6 +29,6 @@ dev = [
 photidy = "src.cli.cli:app"
 
 [tool.maturin]
-module-name = "photidy"
+module-name = "_photidy"
 python-packages = ["src"]
-manifest-path = "rust/photidy/Cargo.toml"
+manifest-path = "rust/_photidy/Cargo.toml"

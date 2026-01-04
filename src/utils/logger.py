@@ -24,7 +24,7 @@ def get_logger(name: str, log_dir: Path = None) -> logging.Logger:
         logger.setLevel(logging.DEBUG)
 
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(logging.ERROR)
 
         if log_dir is None:
             env_log_dir = os.getenv("PHOTIDY_LOG_DIR")

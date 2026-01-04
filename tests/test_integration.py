@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.core.image_info import ImageInfo
 from src.core.organiser import organise_photos
 from src.utils.errors import InvalidDirectoryError
 
@@ -20,7 +21,7 @@ class TestPhotidyIntegration:
             ("photo1.jpg", datetime(2024, 1, 15), "New York, New York, US"),
             ("photo2.jpg", datetime(2024, 1, 15), "New York, New York, US"),
             ("photo3.jpg", datetime(2024, 6, 20), "Los Angeles, California, US"),
-            ("photo4.jpg", datetime(2024, 12, 25), "Unknown"),
+            ("photo4.jpg", datetime(2024, 12, 25), "Unknown Location"),
         ]
 
         for photo_name, _, _ in photos:
@@ -29,8 +30,20 @@ class TestPhotidyIntegration:
         def mock_get_image_info(path):
             for photo_name, date_taken, location in photos:
                 if photo_name in path:
-                    return {"date_taken": date_taken, "location": location}
-            return {"date_taken": None, "location": "Unknown"}
+                    return ImageInfo(
+                        path=path,
+                        timestamp=date_taken,
+                        lat=None,
+                        lon=None,
+                        location=location,
+                    )
+            return ImageInfo(
+                path=path,
+                timestamp=None,
+                lat=None,
+                lon=None,
+                location="Unknown Location",
+            )
 
         with patch(
             "src.core.organiser.get_image_info", side_effect=mock_get_image_info
@@ -78,10 +91,13 @@ class TestPhotidyIntegration:
         image_file = valid_source_dir / "photo.jpg"
         image_file.write_text("fake image")
 
-        mock_image_info = {
-            "date_taken": datetime(2024, 3, 7, 15, 45, 30),
-            "location": "Paris, Île-de-France, FR",
-        }
+        mock_image_info = ImageInfo(
+            path=str(image_file),
+            timestamp=datetime(2024, 3, 7, 15, 45, 30),
+            lat=None,
+            lon=None,
+            location="Paris, Île-de-France, FR",
+        )
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
             isolate_state["organise_photos"](str(valid_source_dir), str(valid_dest_dir))
@@ -106,10 +122,13 @@ class TestPhotidyIntegration:
 
         assert image_file.exists()
 
-        mock_image_info = {
-            "date_taken": datetime(2024, 5, 12),
-            "location": "Unknown",
-        }
+        mock_image_info = ImageInfo(
+            path=str(image_file),
+            timestamp=datetime(2024, 5, 12),
+            lat=None,
+            lon=None,
+            location="Unknown Location",
+        )
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
             isolate_state["organise_photos"](str(valid_source_dir), str(valid_dest_dir))
@@ -137,9 +156,21 @@ class TestPhotidyIntegration:
 
         def mock_get_image_info(path):
             if "valid" in path:
-                return {"date_taken": datetime(2024, 1, 1), "location": "Unknown"}
+                return ImageInfo(
+                    path=path,
+                    timestamp=datetime(2024, 1, 1),
+                    lat=None,
+                    lon=None,
+                    location="Unknown Location",
+                )
             elif "no_metadata" in path:
-                return {"date_taken": None, "location": "Unknown"}
+                return ImageInfo(
+                    path=path,
+                    timestamp=None,
+                    lat=None,
+                    lon=None,
+                    location="Unknown Location",
+                )
             else:
                 raise Exception("Processing error")
 
@@ -195,10 +226,13 @@ class TestPhotidyIntegration:
                 "Los Angeles, California, US",
                 "Unknown",
             ]
-            return {
-                "date_taken": dates[photo_num % 3],
-                "location": locations[photo_num % 3],
-            }
+            return ImageInfo(
+                path=path,
+                timestamp=dates[photo_num % 3],
+                lat=None,
+                lon=None,
+                location=locations[photo_num % 3],
+            )
 
         with patch(
             "src.core.organiser.get_image_info", side_effect=mock_get_image_info
@@ -221,10 +255,13 @@ class TestPhotidyIntegration:
         file1 = valid_source_dir / "vacation.jpg"
         file1.write_text("fake image 1")
 
-        mock_image_info = {
-            "date_taken": datetime(2024, 7, 10),
-            "location": "Unknown",
-        }
+        mock_image_info = ImageInfo(
+            path=str(file1),
+            timestamp=datetime(2024, 7, 10),
+            lat=None,
+            lon=None,
+            location="Unknown Location",
+        )
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
             summary1 = isolate_state["organise_photos"](
@@ -240,7 +277,15 @@ class TestPhotidyIntegration:
         file2 = valid_source_dir / "vacation.jpg"
         file2.write_text("fake image 2")
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
+        mock_image_info2 = ImageInfo(
+            path=str(file2),
+            timestamp=datetime(2024, 7, 10),
+            lat=None,
+            lon=None,
+            location="Unknown Location",
+        )
+
+        with patch("src.core.organiser.get_image_info", return_value=mock_image_info2):
             summary2 = isolate_state["organise_photos"](
                 str(valid_source_dir), str(valid_dest_dir)
             )

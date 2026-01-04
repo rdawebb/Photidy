@@ -1,6 +1,6 @@
 """Module to manage the embedded database for reverse geocoding"""
 
-from rust.photidy import reverse_geocode
+from _photidy import reverse_geocode
 from src.utils.errors import DatabaseError
 
 from .extraction import extract_db

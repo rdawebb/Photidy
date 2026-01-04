@@ -336,9 +336,9 @@ class TestRustExtractMetadataIntegration:
 
     def test_extract_metadata_with_complete_exif(self):
         """Test extract_metadata with complete EXIF data (date and GPS)."""
-        from photidy import extract_metadata
+        from _photidy import extract_metadata
 
-        result = extract_metadata("rust/photidy/tests/fixtures/complete_exif.jpg")
+        result = extract_metadata("rust/_photidy/tests/fixtures/complete_exif.jpg")
 
         # Verify all required attributes exist
         assert hasattr(result, "timestamp")
@@ -361,9 +361,9 @@ class TestRustExtractMetadataIntegration:
 
     def test_extract_metadata_without_exif(self):
         """Test extract_metadata with an image that has no EXIF data."""
-        from photidy import extract_metadata
+        from _photidy import extract_metadata
 
-        result = extract_metadata("rust/photidy/tests/fixtures/no_exif.jpg")
+        result = extract_metadata("rust/_photidy/tests/fixtures/no_exif.jpg")
 
         # Should have all attributes but with None/default values for missing EXIF
         assert hasattr(result, "timestamp")
@@ -377,9 +377,9 @@ class TestRustExtractMetadataIntegration:
 
     def test_extract_metadata_with_gps_only(self):
         """Test extract_metadata with GPS data but no date."""
-        from photidy import extract_metadata
+        from _photidy import extract_metadata
 
-        result = extract_metadata("rust/photidy/tests/fixtures/only_gps.jpg")
+        result = extract_metadata("rust/_photidy/tests/fixtures/only_gps.jpg")
 
         # Should have GPS but no date
         assert result.timestamp is None
@@ -394,9 +394,9 @@ class TestRustExtractMetadataIntegration:
 
     def test_extract_metadata_with_date_only(self):
         """Test extract_metadata with date but no GPS data."""
-        from photidy import extract_metadata
+        from _photidy import extract_metadata
 
-        result = extract_metadata("rust/photidy/tests/fixtures/only_date.jpg")
+        result = extract_metadata("rust/_photidy/tests/fixtures/only_date.jpg")
 
         # Should have date but no GPS
         assert result.timestamp is not None

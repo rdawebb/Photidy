@@ -105,6 +105,8 @@ def scan_directory(source_dir: str) -> dict:
                 for entry in entries:
                     if entry.is_file():
                         try:
+                            if entry.name.startswith("."):
+                                continue
                             if entry.name.lower().endswith(SUPPORTED_FORMATS):
                                 photo_files.append(Path(entry.path))
                             else:
@@ -179,7 +181,7 @@ def organise_photos(
             f"Failed to create staging directory: {staging_dir}"
         ) from e
 
-    logger.info(f"Starting photo organisation from {source} to {dest}")
+    logger.debug(f"Starting photo organisation from {source} to {dest}")
 
     state = _load_state(state_file)
     processed = 0
@@ -196,8 +198,8 @@ def organise_photos(
         try:
             logger.debug(f"Processing file: {file_path.name}")
             image_info = get_image_info(str(file_path))
-            date = image_info.get("date_taken")
-            location = image_info.get("location")
+            date = image_info.timestamp
+            location = image_info.location
 
             if not date:
                 logger.warning(f"Missing date for {file_path.name}, skipping.")
@@ -210,9 +212,9 @@ def organise_photos(
             month = date.strftime("%m")
             day = date.strftime("%d")
 
-            if location and location != "Unknown":
+            if location and location != "Unknown Location":
                 target_dir = dest / year / month / day / location
-            else:
+            elif not location or location == "Unknown Location":
                 target_dir = dest / year / month / day
 
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -277,7 +279,32 @@ def organise_photos(
     return summary
 
 
-def undo_organisation(undo_log_path: Optional[Path] = None) -> None:
+def _remove_empty_dirs(root: Path) -> None:
+    """Remove empty directories recursively up to stop (non-inclusive)
+
+    Args:
+        path (Path): The directory path to clean
+        stop (Path): The directory path to stop at (non-inclusive)
+    """
+    for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+        path = Path(dirpath)
+        for file in path.iterdir():
+            if file.is_file() and file.name.startswith("."):
+                try:
+                    file.unlink()
+                    logger.debug(f"Removed hidden file: {file}")
+                except Exception as e:
+                    logger.debug(f"Could not remove hidden file {file}: {e}")
+
+        try:
+            if not any(path.iterdir()):
+                path.rmdir()
+                logger.debug(f"Removed empty directory: {path}")
+        except OSError as e:
+            logger.debug(f"Could not remove directory {path}: {e}")
+
+
+def undo_organisation(undo_log_path: Optional[Path] = None) -> bool:
     """Undo the last organisation operation.
 
     Args:
@@ -288,11 +315,18 @@ def undo_organisation(undo_log_path: Optional[Path] = None) -> None:
 
     if not undo_log_path.exists():
         logger.warning("No undo log found. Nothing to undo.")
-        return
+        return False
 
     try:
         with open(undo_log) as f:
             moves = [line.strip().split(",", 1) for line in f if "," in line]
+
+        dest_paths = [Path(dest) for _, dest in moves]
+        if not dest_paths:
+            logger.warning("No valid destination paths found for undo.")
+            return False
+
+        main_dest_root = os.path.commonpath([p.parent for p in dest_paths])
 
         for src, dest in reversed(moves):
             try:
@@ -305,11 +339,41 @@ def undo_organisation(undo_log_path: Optional[Path] = None) -> None:
 
             except Exception as e:
                 logger.error(f"Failed to restore {dest} to {src}: {e}")
+                raise PhotoOrganisationError(f"Failed to restore {dest} to {src}: {e}")
+
+        # Cleanup created directories & staging area
+        staging_dir = Path(main_dest_root) / STAGING_DIR
+        try:
+            staging_dir.rmdir()
+            logger.debug(f"Removed empty directory: {staging_dir}")
+        except OSError:
+            logger.debug(f"Directory not empty or missing: {staging_dir}")
+
+        _remove_empty_dirs(Path(main_dest_root))
+
+        # Clear the state file
+        state_file_path = state_file
+        try:
+            with open(state_file_path, "w") as f:
+                json.dump({}, f)
+            logger.debug("Cleared state file after undo operation")
+        except Exception as e:
+            logger.warning(f"Failed to clear state file after undo: {e}")
+
+        # Clear the undo log
+        try:
+            with open(undo_log_path, "w") as f:
+                f.write("")
+            logger.debug("Cleared undo log after undo operation")
+        except Exception as e:
+            logger.warning(f"Failed to clear undo log after undo: {e}")
 
         logger.info("Undo operation completed.")
+        return True
 
     except Exception as e:
         logger.error(f"Error during undo operation: {e}")
+        raise PhotoOrganisationError(f"Error during undo operation: {e}")
 
 
 def _validate_directories(source: Path, dest: Optional[Path] = None) -> None:

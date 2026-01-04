@@ -2,9 +2,17 @@
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QFont, QPixmap
-from PySide6.QtWidgets import QMainWindow, QDialog, QVBoxLayout, QLabel, QPushButton
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QDialog,
+    QVBoxLayout,
+    QLabel,
+    QPushButton,
+)
 
 from src import __version__
+from src.ui.containers.main_container import MainContainer
 
 
 class MainWindow(QMainWindow):
@@ -14,6 +22,8 @@ class MainWindow(QMainWindow):
         """Initialise the main window"""
         super().__init__()
         self.setWindowTitle("📷 Photidy")
+        self.main_container = MainContainer(self)
+        self.setCentralWidget(self.main_container)
 
         # Set up the native app menubar
         menubar = self.menuBar()
@@ -40,7 +50,7 @@ class MainWindow(QMainWindow):
         self.about_action.triggered.connect(self.on_about)
         help_menu.addAction(self.about_action)
 
-        self.resize(800, 600)
+        self.resize(600, 400)
         self._center_window()
 
     def _center_window(self):
@@ -53,7 +63,18 @@ class MainWindow(QMainWindow):
 
     def on_exit(self):
         """Handle the exit menu item"""
-        self.close()
+        if self.main_container.is_process_running():
+            self.hide()
+        else:
+            QApplication.quit()
+
+    def closeEvent(self, event):
+        """Handle the close event"""
+        if self.main_container.is_process_running():
+            self.hide()
+            event.ignore()
+        else:
+            event.accept()
 
     def on_preferences(self):
         """Handle the preferences menu item"""
@@ -66,7 +87,7 @@ class MainWindow(QMainWindow):
 
         # Icon
         icon_label = QLabel()
-        pixmap = QPixmap("src/ui/placeholder.png")
+        pixmap = QPixmap("src/ui/assets/placeholder.png")
         icon_label.setPixmap(pixmap)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_label)

@@ -14,7 +14,7 @@ def runtime_root() -> Path:
     """
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS)  # type: ignore[attr-defined]
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[1]
 
 
 def db_path() -> Path:
@@ -23,4 +23,4 @@ def db_path() -> Path:
     Returns:
         Path: The database file path
     """
-    return runtime_root() / "rust" / "photidy" / "data" / "places_v0.1.db"
+    return runtime_root() / "rust" / "_photidy" / "data" / "places_v0.1.db"

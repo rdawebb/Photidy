@@ -213,7 +213,7 @@ __marimo__/
 scripts/data/
 
 # Generated database
-rust/photidy/data/
+rust/_photidy/data/
 
 # Generated logs
 logs/

@@ -25,7 +25,7 @@ class TestGetLogger:
     @pytest.mark.parametrize(
         "handler_type,expected_level",
         [
-            ("console", logging.INFO),
+            ("console", logging.ERROR),
             ("file", logging.DEBUG),
         ],
         ids=["console_info", "file_debug"],

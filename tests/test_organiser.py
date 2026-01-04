@@ -1,12 +1,13 @@
 """Tests for photo organisation in src/core/organiser.py"""
 
-from datetime import datetime
 import os
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from src.core.image_info import ImageInfo
 from src.core.organiser import (
     _get_unique_filename,
     _validate_directories,
@@ -134,7 +135,7 @@ class TestOrganisePhotos:
             ),
             (
                 datetime(2024, 6, 20, 10, 15, 30),
-                "Unknown",
+                "Unknown Location",
                 Path("2024") / "06" / "20" / "photo.jpg",
             ),
         ],
@@ -154,10 +155,13 @@ class TestOrganisePhotos:
         image_file = valid_source_dir / "photo.jpg"
         image_file.write_text("fake image")
 
-        mock_image_info = {
-            "date_taken": date_taken,
-            "location": location,
-        }
+        mock_image_info = ImageInfo(
+            path=image_file,
+            timestamp=date_taken,
+            lat=None,
+            lon=None,
+            location=location,
+        )
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
             summary = isolate_state["organise_photos"](
@@ -181,12 +185,19 @@ class TestOrganisePhotos:
         bad_file = valid_source_dir / "broken.jpg"
         bad_file.write_text("fake image")
 
+        from pathlib import Path
+
+        from src.core.image_info import ImageInfo
+
         def mock_get_image_info(path):
-            if "good" in path:
-                return {
-                    "date_taken": datetime(2024, 1, 15),
-                    "location": "New York, New York, US",
-                }
+            if "good" in str(path):
+                return ImageInfo(
+                    path=Path(path),
+                    timestamp=datetime(2024, 1, 15),
+                    lat=None,
+                    lon=None,
+                    location="New York, New York, US",
+                )
             else:
                 raise PhotoMetadataError("Invalid metadata")
 
@@ -229,10 +240,15 @@ class TestOrganisePhotos:
         image_file.write_text("fake image")
 
         if error_type == "missing_date":
-            mock_image_info = {
-                "date_taken": None,
-                "location": "New York, New York, US",
-            }
+            from src.core.image_info import ImageInfo
+
+            mock_image_info = ImageInfo(
+                path=image_file,
+                timestamp=None,
+                lat=None,
+                lon=None,
+                location="New York, New York, US",
+            )
             with patch(
                 "src.core.organiser.get_image_info", return_value=mock_image_info
             ):
@@ -291,20 +307,26 @@ class TestOrganisePhotos:
     def test_subdirectories_in_source_ignored(
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
-        """Test that subdirectories in source are ignored."""
+        """Test that files in subdirectories are also processed recursively."""
         subdir = valid_source_dir / "subdir"
         subdir.mkdir(exist_ok=True)
         image_file = subdir / "photo.jpg"
         image_file.write_text("fake image")
 
-        mock_image_info = {"date_taken": datetime(2024, 1, 15), "location": "Unknown"}
+        mock_image_info = ImageInfo(
+            path=image_file,
+            timestamp=datetime(2024, 1, 15),
+            lat=None,
+            lon=None,
+            location="Unknown Location",
+        )
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
             summary = isolate_state["organise_photos"](
                 str(valid_source_dir), str(valid_dest_dir)
             )
 
-        # Should only process files directly in source, not in subdirectories
+        # Files in subdirectories are also scanned and processed recursively
         assert summary["processed"] == 1
         assert summary["failed"] == []
         assert summary["total"] == 1
@@ -317,12 +339,17 @@ class TestOrganisePhotos:
         [
             (
                 [("photo1.jpg", "fake image 1"), ("photo2.jpg", "fake image 2")],
-                lambda path: {
-                    "date_taken": datetime(2024, 1, 15),
-                    "location": "New York, New York, US"
-                    if "photo1" in path
+                lambda path: __import__(
+                    "src.core.image_info"
+                ).core.image_info.ImageInfo(
+                    path=Path(path),
+                    timestamp=datetime(2024, 1, 15),
+                    lat=None,
+                    lon=None,
+                    location="New York, New York, US"
+                    if "photo1" in str(path)
                     else "Los Angeles, California, US",
-                },
+                ),
                 [
                     (
                         Path("2024")
@@ -342,12 +369,17 @@ class TestOrganisePhotos:
             ),
             (
                 [("photo1.jpg", "fake image 1"), ("photo2.jpg", "fake image 2")],
-                lambda path: {
-                    "date_taken": datetime(2024, 1, 15)
-                    if "photo1" in path
+                lambda path: __import__(
+                    "src.core.image_info"
+                ).core.image_info.ImageInfo(
+                    path=Path(path),
+                    timestamp=datetime(2024, 1, 15)
+                    if "photo1" in str(path)
                     else datetime(2024, 12, 25),
-                    "location": "Unknown",
-                },
+                    lat=None,
+                    lon=None,
+                    location="Unknown Location",
+                ),
                 [
                     (Path("2024") / "01" / "15" / "photo1.jpg",),
                     (Path("2024") / "12" / "25" / "photo2.jpg",),
@@ -393,10 +425,13 @@ class TestOrganisePhotos:
         target_dir.mkdir(parents=True)
         (target_dir / "photo.jpg").write_text("existing file")
 
-        mock_image_info = {
-            "date_taken": datetime(2024, 1, 15),
-            "location": "Unknown",
-        }
+        mock_image_info = ImageInfo(
+            path=image_file,
+            timestamp=datetime(2024, 1, 15),
+            lat=None,
+            lon=None,
+            location="Unknown Location",
+        )
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
             summary = isolate_state["organise_photos"](
@@ -416,10 +451,13 @@ class TestOrganisePhotos:
         file2 = valid_source_dir / "photo2.jpg"
         file2.write_text("fake image")
 
-        mock_image_info = {
-            "date_taken": datetime(2024, 1, 15),
-            "location": "Unknown",
-        }
+        mock_image_info = ImageInfo(
+            path=file1,
+            timestamp=datetime(2024, 1, 15),
+            lat=None,
+            lon=None,
+            location="Unknown Location",
+        )
 
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
             summary = isolate_state["organise_photos"](
@@ -450,10 +488,13 @@ class TestOrganisePhotosDefaultPaths:
             image_file = valid_source_dir / "photo.jpg"
             image_file.write_text("fake image")
 
-            mock_image_info = {
-                "date_taken": datetime(2024, 1, 15, 14, 30, 45),
-                "location": "New York, New York, US",
-            }
+            mock_image_info = ImageInfo(
+                path=image_file,
+                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                lat=None,
+                lon=None,
+                location="New York, New York, US",
+            )
 
             # Change to temp directory so default paths write there
             import os
@@ -495,10 +536,15 @@ class TestOrganisePhotosDefaultPaths:
             image_file = valid_source_dir / "photo.jpg"
             image_file.write_text("fake image")
 
-            mock_image_info = {
-                "date_taken": datetime(2024, 1, 15, 14, 30, 45),
-                "location": "New York, New York, US",
-            }
+            from pathlib import Path
+
+            mock_image_info = ImageInfo(
+                path=image_file,
+                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                lat=None,
+                lon=None,
+                location="New York, New York, US",
+            )
 
             import os
 
@@ -554,10 +600,13 @@ class TestOrganisePhotosDefaultPaths:
         image_file = valid_source_dir / "photo.jpg"
         image_file.write_text("fake image")
 
-        mock_image_info = {
-            "date_taken": datetime(2024, 1, 15, 14, 30, 45),
-            "location": "New York, New York, US",
-        }
+        mock_image_info = ImageInfo(
+            path=image_file,
+            timestamp=datetime(2024, 1, 15, 14, 30, 45),
+            lat=None,
+            lon=None,
+            location="New York, New York, US",
+        )
 
         if move_failure_type == "staging_move_fails":
             # Mock shutil.move to fail on first call (staging)
@@ -610,10 +659,13 @@ class TestOrganisePhotosDefaultPaths:
         image_file = valid_source_dir / "photo.jpg"
         image_file.write_text("fake image")
 
-        mock_image_info = {
-            "date_taken": datetime(2024, 1, 15, 14, 30, 45),
-            "location": "New York, New York, US",
-        }
+        mock_image_info = ImageInfo(
+            path=image_file,
+            timestamp=datetime(2024, 1, 15, 14, 30, 45),
+            lat=None,
+            lon=None,
+            location="New York, New York, US",
+        )
 
         # Mock Path.mkdir to raise Error when called
         with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
@@ -661,10 +713,13 @@ class TestOrganisePhotosDefaultPaths:
             image_file = valid_source_dir / "photo.jpg"
             image_file.write_text("fake image")
 
-            mock_image_info = {
-                "date_taken": datetime(2024, 1, 15, 14, 30, 45),
-                "location": "New York, New York, US",
-            }
+            mock_image_info = ImageInfo(
+                path=image_file,
+                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                lat=None,
+                lon=None,
+                location="New York, New York, US",
+            )
 
             original_cwd = os.getcwd()
             try:
@@ -726,10 +781,13 @@ class TestOrganisePhotosDefaultPaths:
                 # organise a photo first
                 image_file = valid_source_dir / "photo.jpg"
                 image_file.write_text("fake image")
-                mock_image_info = {
-                    "date_taken": datetime(2024, 1, 15, 14, 30, 45),
-                    "location": "New York, New York, US",
-                }
+                mock_image_info = ImageInfo(
+                    path=image_file,
+                    timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                    lat=None,
+                    lon=None,
+                    location="New York, New York, US",
+                )
                 with patch(
                     "src.core.organiser.get_image_info", return_value=mock_image_info
                 ):
@@ -781,16 +839,21 @@ class TestOrganisePhotosDefaultPaths:
         image_file = valid_source_dir / "photo.jpg"
         image_file.write_text("fake image")
 
-        mock_image_info = {
-            "date_taken": datetime(2024, 1, 15, 14, 30, 45),
-            "location": "New York, New York, US",
-        }
+        # mock_image_info1 and mock_image_info2 are not used in this test, remove them
 
         original_cwd = os.getcwd()
         try:
             os.chdir(str(tmp_path))
 
             # organise the photo
+
+            mock_image_info = ImageInfo(
+                path=image_file,
+                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                lat=None,
+                lon=None,
+                location="New York, New York, US",
+            )
             with patch(
                 "src.core.organiser.get_image_info", return_value=mock_image_info
             ):
@@ -820,7 +883,7 @@ class TestOrganisePhotosDefaultPaths:
         self, suppress_logging, tmp_path, permission_error_type
     ):
         """Test handling of permission errors in state/log operations."""
-        from src.core.organiser import _save_state, _log_move
+        from src.core.organiser import _log_move, _save_state
 
         if permission_error_type == "save_state":
             state_file = tmp_path / "state.json"
@@ -868,7 +931,7 @@ class TestOrganisePhotosDefaultPaths:
         self, suppress_logging, tmp_path, error_type, mock_patch
     ):
         """Test error handling in state and log operations."""
-        from src.core.organiser import _load_state, _save_state, _log_move
+        from src.core.organiser import _load_state, _log_move, _save_state
 
         patch_target, error = mock_patch(tmp_path)
 
@@ -910,23 +973,36 @@ class TestOrganisePhotosDefaultPaths:
             patch("src.core.organiser.undo_log", undo_log),
         ):
             # Create multiple test images
+
             image1 = valid_source_dir / "photo1.jpg"
             image2 = valid_source_dir / "photo2.jpg"
             image1.write_text("fake image 1")
             image2.write_text("fake image 2")
 
-            mock_image_info = {
-                "date_taken": datetime(2024, 1, 15, 14, 30, 45),
-                "location": "New York, New York, US",
-            }
+            mock_image_info1 = ImageInfo(
+                path=image1,
+                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                lat=None,
+                lon=None,
+                location="New York, New York, US",
+            )
+            mock_image_info2 = ImageInfo(
+                path=image2,
+                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                lat=None,
+                lon=None,
+                location="New York, New York, US",
+            )
 
             original_cwd = os.getcwd()
             try:
                 os.chdir(str(tmp_path))
 
                 # organise photos
+
                 with patch(
-                    "src.core.organiser.get_image_info", return_value=mock_image_info
+                    "src.core.organiser.get_image_info",
+                    side_effect=[mock_image_info1, mock_image_info2],
                 ):
                     summary = isolate_state["organise_photos"](
                         str(valid_source_dir), str(valid_dest_dir)
