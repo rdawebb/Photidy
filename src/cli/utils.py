@@ -46,8 +46,8 @@ def display_scan_results(summary: dict) -> None:
         show_header=False,
         width=40,
     )
-    table.add_column(None, justify="left", style="cyan", no_wrap=True)
-    table.add_column(None, justify="right", style="magenta")
+    table.add_column(justify="left", style="cyan", no_wrap=True)
+    table.add_column(justify="right", style="magenta")
 
     for category, count in summary.items():
         if (

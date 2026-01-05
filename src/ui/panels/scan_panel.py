@@ -24,27 +24,35 @@ class ScanPanel(QWidget):
             parent (QWidget, optional): The parent widget
         """
         super().__init__(parent)
-        self.layout = QVBoxLayout(self)
+        self._layout = QVBoxLayout(self)
         self.folder_selector = FolderSelector(self)
 
         self.result_table = QTableWidget(self)
         self.result_table.setColumnCount(2)
         self.result_table.horizontalHeader().setVisible(False)
         self.result_table.verticalHeader().setVisible(False)
-        self.result_table.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.result_table.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
         self.result_table.setMaximumWidth(240)
         self.result_table.hide()
 
         self.scan_button = Button("Scan", self)
-        self.scan_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.scan_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
         self.scan_button.setToolTip(
             "Scan the selected folder and subfolders for photos"
         )
 
-        self.layout.addWidget(self.folder_selector)
-        self.layout.addWidget(self.scan_button, alignment=Qt.AlignHCenter | Qt.AlignTop)
-        self.layout.addWidget(
-            self.result_table, alignment=Qt.AlignHCenter | Qt.AlignVCenter
+        self._layout.addWidget(self.folder_selector)
+        self._layout.addWidget(
+            self.scan_button,
+            alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
+        )
+        self._layout.addWidget(
+            self.result_table,
+            alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
         )
 
         self.scan_button.clicked.connect(self.on_scan_clicked)

@@ -16,9 +16,9 @@ class MainContainer(QWidget):
         """
         super().__init__(parent)
         self._process_running = False
-        self.layout = QVBoxLayout(self)
+        self._layout = QVBoxLayout(self)
         self.scan_panel = ScanPanel(self)
-        self.layout.addWidget(self.scan_panel)
+        self._layout.addWidget(self.scan_panel)
 
     def is_process_running(self) -> bool:
         """Check if a process is currently running

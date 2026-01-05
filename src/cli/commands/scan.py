@@ -1,5 +1,7 @@
 """Scan command for Photidy CLI"""
 
+import time
+
 import typer
 from rich.console import Console
 
@@ -21,7 +23,10 @@ def scan_cmd(directory: str) -> None:
         console.print(f"\n[bold cyan]Scanning: [/bold cyan] {directory}\n")
 
         path = validate_and_expand_path(directory)
+
+        start_time = time.perf_counter()
         scan_results = scan_directory(str(path))
+        end_time = time.perf_counter()
 
         display_scan_results(scan_results)
 
@@ -35,7 +40,7 @@ def scan_cmd(directory: str) -> None:
             save_last_scan(directory, [])
         else:
             console.print(
-                f"\n[bold green]Scan complete - {photo_count} photos found![/bold green]\n"
+                f"\n[bold green]Scan complete - {photo_count} photos found in {end_time - start_time:.3f}s![/bold green]\n"
             )
 
         save_last_scan(directory, photo_files)

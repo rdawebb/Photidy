@@ -88,11 +88,11 @@ def scan_directory(source_dir: str) -> dict:
     Returns:
         dict: A summary of the scan results
     """
-    source_dir = Path(source_dir)
+    source = Path(source_dir)
 
-    _validate_directories(source_dir)
+    _validate_directories(source)
 
-    logger.debug(f"Scanning directory: {source_dir}")
+    logger.debug(f"Scanning directory: {source}")
 
     photo_files = []
     other_count = 0
@@ -115,14 +115,14 @@ def scan_directory(source_dir: str) -> dict:
                             logger.warning(f"Error processing file {entry.path}: {e}")
                             inaccessible_count += 1
                     elif entry.is_dir():
-                        _scan(entry.path)
+                        _scan(Path(entry.path))
 
         except (OSError, PermissionError) as e:
             logger.error(f"Error scanning directory {dir}: {e}")
             inaccessible_count += 1
 
     try:
-        _scan(source_dir)
+        _scan(source)
 
     except Exception as e:
         logger.error(f"Error scanning directory {source_dir}: {e}")
@@ -197,7 +197,7 @@ def organise_photos(
 
         try:
             logger.debug(f"Processing file: {file_path.name}")
-            image_info = get_image_info(str(file_path))
+            image_info = get_image_info(file_path)
             date = image_info.timestamp
             location = image_info.location
 
@@ -234,7 +234,7 @@ def organise_photos(
             try:
                 shutil.move(str(staged_path), final_path)
                 logger.debug(f"Moved {file_path.name} to {final_path}")
-                _log_move(str(file_path), str(final_path), undo_log)
+                _log_move(file_path, final_path, undo_log)
                 state[file_path.name] = "processed"
                 _save_state(state, state_file)
                 processed += 1

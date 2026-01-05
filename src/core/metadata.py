@@ -4,18 +4,13 @@ from datetime import datetime
 from pathlib import Path
 
 from runtime.paths import db_path
-from _photidy import extract_metadata, reverse_geocode
+from _photidy import extract_metadata, reverse_geocode  # type: ignore
 from src.core.image_info import ImageInfo
 from src.utils.constants import SUPPORTED_FORMATS
 from src.utils.errors import InvalidPhotoFormatError, PhotoMetadataError
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-# Debug: Log database path on module load
-_db_path = db_path()
-logger.debug(f"Database path resolved to: {_db_path}")
-logger.debug(f"Database exists: {_db_path.exists()}")
 
 
 def get_image_info(file_path: Path) -> ImageInfo:
@@ -31,12 +26,12 @@ def get_image_info(file_path: Path) -> ImageInfo:
         InvalidPhotoFormatError: If the file format is unsupported
         PhotoMetadataError: If metadata extraction fails
     """
-    if not file_path.lower().endswith(SUPPORTED_FORMATS):
+    if not str(file_path).lower().endswith(SUPPORTED_FORMATS):
         logger.warning(f"Unsupported file format: {file_path}")
         raise InvalidPhotoFormatError(f"Unsupported file format: {file_path}")
 
     try:
-        metadata = extract_metadata(file_path)
+        metadata = extract_metadata(str(file_path))
 
         if metadata is None:
             logger.error(f"Failed to extract metadata from {file_path}")

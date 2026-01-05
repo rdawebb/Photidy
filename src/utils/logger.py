@@ -4,9 +4,10 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Optional
 
 
-def get_logger(name: str, log_dir: Path = None) -> logging.Logger:
+def get_logger(name: str, log_dir: Optional[Path] = None) -> logging.Logger:
     """Get a configured logger with console and file handlers.
 
     Log files are rotated when they reach 1 MB, with up to 5 backups.

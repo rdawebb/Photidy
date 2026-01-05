@@ -1,9 +1,7 @@
 """Folder selector widget for selecting directories"""
 
-import sys
-
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFileDialog, QLineEdit, QHBoxLayout, QWidget
+from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLineEdit, QWidget
 
 from .button import Button
 
@@ -20,7 +18,7 @@ class FolderSelector(QWidget):
             parent (QWidget, optional): The parent widget
         """
         super().__init__(parent)
-        self.layout = QHBoxLayout(self)
+        self._layout = QHBoxLayout(self)
 
         self.line_edit = QLineEdit(self)
         self.line_edit.setClearButtonEnabled(True)
@@ -28,12 +26,12 @@ class FolderSelector(QWidget):
 
         self.browse_button = Button("Browse", self)
         self.browse_button.setToolTip("Browse for folder")
-        self.layout.addWidget(self.line_edit)
-        self.layout.addWidget(self.browse_button)
+        self._layout.addWidget(self.line_edit)
+        self._layout.addWidget(self.browse_button)
         self.browse_button.clicked.connect(self.open_folder_dialog)
 
-        if sys.platform == "darwin":
-            self.setAttribute(Qt.WA_AcceptTouchEvents)
+        # Enable touch events if supported
+        self.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents)
 
     def open_folder_dialog(self):
         """Open a folder selection dialog"""

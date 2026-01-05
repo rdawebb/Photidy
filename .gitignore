@@ -212,8 +212,14 @@ __marimo__/
 # Data sources
 scripts/data/
 
+# Test fixtures
+rust/_photidy/tests/fixtures/
+
 # Generated database
 rust/_photidy/data/
 
 # Generated logs
 logs/
+
+# To be committed in future
+README.md

@@ -4,6 +4,7 @@ This module tests the integration between the Python wrapper and Rust backend.
 Rust implementation details (EXIF parsing, GPS coordinate conversion, geocoding) are tested in the Rust test suites.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -71,7 +72,7 @@ class TestGetImageInfo:
             "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
         ):
             with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
-                info = get_image_info("test.jpg")
+                info = get_image_info(Path("test.jpg"))
                 assert info.location == scenario_data["location"]
                 if scenario == "complete":
                     assert info.timestamp is not None
@@ -80,14 +81,14 @@ class TestGetImageInfo:
     def test_unsupported_file_format_raises_error(self, suppress_logging):
         """Test that unsupported file format raises InvalidPhotoFormatError."""
         with pytest.raises(InvalidPhotoFormatError) as exc_info:
-            get_image_info("test.txt")
+            get_image_info(Path("test.txt"))
         assert "Unsupported file format" in str(exc_info.value)
 
     def test_rust_extraction_returns_none_raises_error(self, suppress_logging):
         """Test that Rust function returning None raises PhotoMetadataError."""
         with patch("src.core.metadata.extract_metadata", return_value=None):
             with pytest.raises(PhotoMetadataError) as exc_info:
-                get_image_info("test.jpg")
+                get_image_info(Path("test.jpg"))
             assert "Failed to extract metadata" in str(exc_info.value)
 
     def test_rust_extraction_raises_exception(self, suppress_logging):
@@ -97,7 +98,7 @@ class TestGetImageInfo:
             side_effect=RuntimeError("Rust error"),
         ):
             with pytest.raises(PhotoMetadataError) as exc_info:
-                get_image_info("test.jpg")
+                get_image_info(Path("test.jpg"))
             assert "Unexpected error processing" in str(exc_info.value)
 
     @pytest.mark.parametrize(
@@ -119,7 +120,7 @@ class TestGetImageInfo:
             "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
         ):
             with patch("src.core.metadata.reverse_geocode", return_value=None):
-                info = get_image_info(f"test{file_format}")
+                info = get_image_info(Path(f"test{file_format}"))
                 assert info is not None
 
     def test_case_insensitive_format_validation(
@@ -136,13 +137,13 @@ class TestGetImageInfo:
             "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
         ):
             with patch("src.core.metadata.reverse_geocode", return_value=None):
-                info = get_image_info("test.JPG")
+                info = get_image_info(Path("test.JPG"))
                 assert info is not None
 
     def test_logging_error_invalid_format(self, caplog):
         """Test that invalid file format is logged as error."""
         with pytest.raises(InvalidPhotoFormatError):
-            get_image_info("test.txt")
+            get_image_info(Path("test.txt"))
         assert "Unsupported file format" in caplog.text
 
     @pytest.mark.parametrize(
@@ -191,7 +192,7 @@ class TestGetImageInfo:
             "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
         ):
             with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
-                get_image_info("test.jpg")
+                get_image_info(Path("test.jpg"))
                 if should_contain:
                     assert expected_log_message in caplog.text
 
@@ -210,8 +211,8 @@ class TestGetImageInfo:
             "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
         ):
             with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
-                result = get_image_info("test.jpg")
-                assert result.path == "test.jpg"
+                result = get_image_info(Path("test.jpg"))
+                assert result.path == Path("test.jpg")
                 assert result.timestamp is not None
                 assert result.lat == 40.7128
                 assert result.lon == -74.006
@@ -239,7 +240,7 @@ class TestReverseGeocodeIntegration:
             with patch(
                 "src.core.metadata.reverse_geocode", return_value=mock_place
             ) as mock_geocode:
-                get_image_info("test.jpg")
+                get_image_info(Path("test.jpg"))
                 # Verify reverse_geocode was called with the correct coordinates
                 mock_geocode.assert_called_once()
                 call_args = mock_geocode.call_args
@@ -261,7 +262,7 @@ class TestReverseGeocodeIntegration:
             "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
         ):
             with patch("src.core.metadata.reverse_geocode") as mock_geocode:
-                get_image_info("test.jpg")
+                get_image_info(Path("test.jpg"))
                 # Verify reverse_geocode was NOT called
                 mock_geocode.assert_not_called()
 
@@ -280,7 +281,7 @@ class TestReverseGeocodeIntegration:
             "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
         ):
             with patch("src.core.metadata.reverse_geocode", return_value=None):
-                info = get_image_info("test.jpg")
+                info = get_image_info(Path("test.jpg"))
                 assert info.location == "Unknown Location"
 
     def test_reverse_geocode_returns_place_name_correctly(
@@ -299,7 +300,7 @@ class TestReverseGeocodeIntegration:
             "src.core.metadata.extract_metadata", return_value=mock_rust_metadata
         ):
             with patch("src.core.metadata.reverse_geocode", return_value=mock_place):
-                info = get_image_info("test.jpg")
+                info = get_image_info(Path("test.jpg"))
                 assert info.location == "San Francisco, California, US"
 
     def test_reverse_geocode_exception_handling(
@@ -321,7 +322,7 @@ class TestReverseGeocodeIntegration:
                 side_effect=RuntimeError("Geocoding failed"),
             ):
                 with pytest.raises(PhotoMetadataError) as exc_info:
-                    get_image_info("test.jpg")
+                    get_image_info(Path("test.jpg"))
                 assert "Unexpected error processing" in str(exc_info.value)
 
 
@@ -333,7 +334,7 @@ class TestRustExtractMetadataIntegration:
 
     def test_extract_metadata_with_complete_exif(self):
         """Test extract_metadata with complete EXIF data (date and GPS)."""
-        from _photidy import extract_metadata
+        from _photidy import extract_metadata  # type: ignore
 
         result = extract_metadata("rust/_photidy/tests/fixtures/complete_exif.jpg")
 
@@ -358,7 +359,7 @@ class TestRustExtractMetadataIntegration:
 
     def test_extract_metadata_without_exif(self):
         """Test extract_metadata with an image that has no EXIF data."""
-        from _photidy import extract_metadata
+        from _photidy import extract_metadata  # type: ignore
 
         result = extract_metadata("rust/_photidy/tests/fixtures/no_exif.jpg")
 
@@ -374,7 +375,7 @@ class TestRustExtractMetadataIntegration:
 
     def test_extract_metadata_with_gps_only(self):
         """Test extract_metadata with GPS data but no date."""
-        from _photidy import extract_metadata
+        from _photidy import extract_metadata  # type: ignore
 
         result = extract_metadata("rust/_photidy/tests/fixtures/only_gps.jpg")
 
@@ -391,7 +392,7 @@ class TestRustExtractMetadataIntegration:
 
     def test_extract_metadata_with_date_only(self):
         """Test extract_metadata with date but no GPS data."""
-        from _photidy import extract_metadata
+        from _photidy import extract_metadata  # type: ignore
 
         result = extract_metadata("rust/_photidy/tests/fixtures/only_date.jpg")
 

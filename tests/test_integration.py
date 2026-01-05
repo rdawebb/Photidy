@@ -1,6 +1,7 @@
 """Integration tests for the Photidy application"""
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -29,16 +30,16 @@ class TestPhotidyIntegration:
 
         def mock_get_image_info(path):
             for photo_name, date_taken, location in photos:
-                if photo_name in path:
+                if photo_name in str(path):
                     return ImageInfo(
-                        path=path,
+                        path=Path(path),
                         timestamp=date_taken,
                         lat=None,
                         lon=None,
                         location=location,
                     )
             return ImageInfo(
-                path=path,
+                path=Path(path),
                 timestamp=None,
                 lat=None,
                 lon=None,
@@ -92,7 +93,7 @@ class TestPhotidyIntegration:
         image_file.write_text("fake image")
 
         mock_image_info = ImageInfo(
-            path=str(image_file),
+            path=image_file,
             timestamp=datetime(2024, 3, 7, 15, 45, 30),
             lat=None,
             lon=None,
@@ -123,7 +124,7 @@ class TestPhotidyIntegration:
         assert image_file.exists()
 
         mock_image_info = ImageInfo(
-            path=str(image_file),
+            path=image_file,
             timestamp=datetime(2024, 5, 12),
             lat=None,
             lon=None,
@@ -155,17 +156,17 @@ class TestPhotidyIntegration:
         txt_file.write_text("not an image")
 
         def mock_get_image_info(path):
-            if "valid" in path:
+            if "valid" in str(path):
                 return ImageInfo(
-                    path=path,
+                    path=Path(path),
                     timestamp=datetime(2024, 1, 1),
                     lat=None,
                     lon=None,
                     location="Unknown Location",
                 )
-            elif "no_metadata" in path:
+            elif "no_metadata" in str(path):
                 return ImageInfo(
-                    path=path,
+                    path=Path(path),
                     timestamp=None,
                     lat=None,
                     lon=None,
@@ -208,8 +209,6 @@ class TestPhotidyIntegration:
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test organising a large batch of photos."""
-        from pathlib import Path
-
         for i in range(20):
             (valid_source_dir / f"photo_{i}.jpg").write_text("fake image")
 
@@ -227,7 +226,7 @@ class TestPhotidyIntegration:
                 "Unknown",
             ]
             return ImageInfo(
-                path=path,
+                path=Path(path),
                 timestamp=dates[photo_num % 3],
                 lat=None,
                 lon=None,
@@ -256,7 +255,7 @@ class TestPhotidyIntegration:
         file1.write_text("fake image 1")
 
         mock_image_info = ImageInfo(
-            path=str(file1),
+            path=file1,
             timestamp=datetime(2024, 7, 10),
             lat=None,
             lon=None,
@@ -278,7 +277,7 @@ class TestPhotidyIntegration:
         file2.write_text("fake image 2")
 
         mock_image_info2 = ImageInfo(
-            path=str(file2),
+            path=file2,
             timestamp=datetime(2024, 7, 10),
             lat=None,
             lon=None,

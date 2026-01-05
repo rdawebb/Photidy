@@ -1,5 +1,7 @@
 """Undo command for the Photidy CLI"""
 
+import time
+
 import typer
 from rich.console import Console
 
@@ -16,14 +18,17 @@ def undo_cmd() -> None:
     )
     if response.lower() in ("y", "yes"):
         try:
+            start_time = time.perf_counter()
             if not undo_organisation():
                 console.print(
                     "\nNo undo log found, nothing to undo",
                     style="bold yellow",
                 )
             else:
+                end_time = time.perf_counter()
                 console.print(
-                    "\nUndo operation completed successfully!", style="bold green"
+                    f"\nUndo operation completed successfully in {end_time - start_time:.3f}s!",
+                    style="bold green",
                 )
 
         except PhotoOrganisationError as e:

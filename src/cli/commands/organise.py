@@ -1,5 +1,6 @@
 """Organise command for the Photidy CLI"""
 
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -27,37 +28,46 @@ def organise_cmd(
     """Organise photos into folders based on their metadata"""
     last_scan = load_last_scan()
 
-    if last_scan and not photo_files and not source:
+    if not source and not photo_files and last_scan:
         dir_path = last_scan.get("directory")
         photo_files = last_scan.get("photo_files")
 
-        response = console.input(
-            f"[cyan]Would you like to organise photos from {dir_path}? (y/n): [/cyan]"
-        )
-        if response.lower() in ("y", "yes"):
-            source = validate_and_expand_path(dir_path)
-        else:
-            console.print("\n[bold yellow]Operation cancelled.[/bold yellow]")
-            raise typer.Exit(code=0)
+        if dir_path:
+            response = console.input(
+                f"[cyan]Would you like to organise photos from {dir_path}? (y/n): [/cyan]"
+            )
+            if response.lower() in ("y", "yes"):
+                source = str(dir_path)
+            else:
+                console.print("\n[bold yellow]Operation cancelled[/bold yellow]")
+                raise typer.Exit(code=0)
+
+    if not source:
+        source = console.input("\n[cyan]Enter source directory: [/cyan]")
+
+    source_path = validate_and_expand_path(source)
+    if source_path is None:
+        console.print("\n[red]Error: [/red] Invalid source directory")
+        raise typer.Exit(code=1)
+    source = str(source_path)
 
     if not photo_files:
-        if not source:
-            console.print(
-                "\n[red]Error: [/red] No source directory provided for organisation"
-            )
-            raise typer.Exit(code=1)
-
         photo_files = scan_cmd(source)
         if not photo_files:
-            console.print("\n[red]Error: [/red] No photo files found for organisation.")
+            console.print("\n[red]Error: [/red] No photo files found for organisation")
             raise typer.Exit(code=1)
 
+    output = output or console.input("\n[cyan]Enter output directory: [/cyan]")
+    output_path = validate_and_expand_path(output)
+    if output_path is None:
+        console.print("\n[red]Error: [/red] Invalid output directory")
+        raise typer.Exit(code=1)
+    output = str(output_path)
+
     try:
-        output = output or console.input("\n[cyan]Enter output directory: [/cyan]")
-        output = validate_and_expand_path(output)
+        start_time = time.perf_counter()
         organise_photos(source, output, photo_files=photo_files)
-        console.print("\n[bold green]Photos organised successfully![/bold green]")
-        console.print(f"\n[bold green]Output Directory: [/bold green] {Path(output)}")
+        end_time = time.perf_counter()
 
     except InvalidDirectoryError as e:
         console.print(f"\n[red]Directory error: [/red] {e}")
@@ -71,3 +81,8 @@ def organise_cmd(
     except Exception as e:
         console.print(f"\n[red]Unexpected error: [/red] {e}")
         raise typer.Exit(code=1)
+
+    console.print(
+        f"\n[bold green]Photos organised successfully in {end_time - start_time:.3f}s![/bold green]"
+    )
+    console.print(f"\n[bold green]Output Directory: [/bold green] {Path(output)}")

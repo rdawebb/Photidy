@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -230,8 +231,8 @@ def isolate_state(tmp_path):
     from src.core.organiser import organise_photos as _organise_photos
 
     # Create temporary state files
-    temp_state_file = tmp_path / "organiser_state.json"
-    temp_undo_log = tmp_path / "organiser_undo.log"
+    temp_state_file = Path(tmp_path / "organiser_state.json")
+    temp_undo_log = Path(tmp_path / "organiser_undo.log")
 
     def organise_photos_isolated(source_dir, dest_dir):
         """Wrapper that calls organise_photos with isolated state files."""

@@ -1,0 +1,39 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=100']
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.8
+    hooks:
+      - id: ruff
+        args: ["."]
+
+  - repo: https://github.com/awslabs/git-secrets
+    rev: v1.3.0
+    hooks:
+      - id: git-secrets
+        stages: [commit]
+
+  - repo: local
+    hooks:
+      - id: cargo-check
+        name: Check Rust code compiles
+        entry: cargo check
+        language: system
+        types: [rust]
+        pass_filenames: false
+        working_directory: rust/_photidy
+
+  - repo: local
+    hooks:
+    - id: python-syntax-check
+      name: Check Python syntax errors
+      entry: python -m py_compile
+      language: system
+      types: [python]
