@@ -86,10 +86,12 @@ class TestGetLogger:
         logger = get_logger("test_formatter")
         for handler in logger.handlers:
             assert handler.formatter is not None
-            assert "%(asctime)s" in handler.formatter._fmt
-            assert "%(name)s" in handler.formatter._fmt
-            assert "%(levelname)s" in handler.formatter._fmt
-            assert "%(message)s" in handler.formatter._fmt
+            fmt = getattr(handler.formatter, "_fmt", None)
+            assert isinstance(fmt, str)
+            assert "%(asctime)s" in fmt
+            assert "%(name)s" in fmt
+            assert "%(levelname)s" in fmt
+            assert "%(message)s" in fmt
 
     def test_same_logger_instance_returned(self):
         """Test that multiple calls return the same logger instance."""

@@ -1,34 +1,42 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
-        args: ['--maxkb=100']
+        args: ['--maxkb=200']
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-merge-conflict
+      - id: check-yaml
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.8
+    rev: v0.14.10
     hooks:
-      - id: ruff
-        args: ["."]
+      - id: ruff-check
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+    - id: ty-type-check
+      name: Type check with ty
+      entry: ty check src tests
+      language: system
+      types: [python]
 
   - repo: https://github.com/awslabs/git-secrets
-    rev: v1.3.0
+    rev: master
     hooks:
       - id: git-secrets
-        stages: [commit]
 
   - repo: local
     hooks:
       - id: cargo-check
         name: Check Rust code compiles
-        entry: cargo check
+        entry: python scripts/cargo_check.py
         language: system
         types: [rust]
         pass_filenames: false
-        working_directory: rust/_photidy
 
   - repo: local
     hooks:

@@ -34,12 +34,12 @@ def organise_cmd(
 
         if dir_path:
             response = console.input(
-                f"[cyan]Would you like to organise photos from {dir_path}? (y/n): [/cyan]"
+                f"\n[cyan]Would you like to organise photos from {dir_path}? (y/n): [/cyan]"
             )
             if response.lower() in ("y", "yes"):
                 source = str(dir_path)
             else:
-                console.print("\n[bold yellow]Operation cancelled[/bold yellow]")
+                console.print("\n[bold yellow]Operation cancelled[/bold yellow]\n")
                 raise typer.Exit(code=0)
 
     if not source:
@@ -47,20 +47,22 @@ def organise_cmd(
 
     source_path = validate_and_expand_path(source)
     if source_path is None:
-        console.print("\n[red]Error: [/red] Invalid source directory")
+        console.print("\n[red]Error: [/red] Invalid source directory\n")
         raise typer.Exit(code=1)
     source = str(source_path)
 
     if not photo_files:
         photo_files = scan_cmd(source)
         if not photo_files:
-            console.print("\n[red]Error: [/red] No photo files found for organisation")
+            console.print(
+                "\n[red]Error: [/red] No photo files found for organisation\n"
+            )
             raise typer.Exit(code=1)
 
     output = output or console.input("\n[cyan]Enter output directory: [/cyan]")
     output_path = validate_and_expand_path(output)
     if output_path is None:
-        console.print("\n[red]Error: [/red] Invalid output directory")
+        console.print("\n[red]Error: [/red] Invalid output directory\n")
         raise typer.Exit(code=1)
     output = str(output_path)
 
@@ -70,19 +72,19 @@ def organise_cmd(
         end_time = time.perf_counter()
 
     except InvalidDirectoryError as e:
-        console.print(f"\n[red]Directory error: [/red] {e}")
+        console.print(f"\n[red]Directory error: [/red] {e}\n")
         raise typer.Exit(code=1)
     except PhotoOrganisationError as e:
-        console.print(f"\n[red]Organisation error: [/red] {e}")
+        console.print(f"\n[red]Organisation error: [/red] {e}\n")
         raise typer.Exit(code=1)
     except PhotoMetadataError as e:
-        console.print(f"\n[red]Metadata error: [/red] {e}")
+        console.print(f"\n[red]Metadata error: [/red] {e}\n")
         raise typer.Exit(code=1)
     except Exception as e:
-        console.print(f"\n[red]Unexpected error: [/red] {e}")
+        console.print(f"\n[red]Unexpected error: [/red] {e}\n")
         raise typer.Exit(code=1)
 
     console.print(
         f"\n[bold green]Photos organised successfully in {end_time - start_time:.3f}s![/bold green]"
     )
-    console.print(f"\n[bold green]Output Directory: [/bold green] {Path(output)}")
+    console.print(f"\n[bold green]Output Directory: [/bold green] {Path(output)}\n")

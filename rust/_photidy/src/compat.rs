@@ -56,7 +56,7 @@ mod tests {
     fn setup_test_db_with_version(version: &str) -> Connection {
         let conn = Connection::open_in_memory()
             .expect("Failed to create in-memory DB");
-        
+
         conn.execute_batch(
             "CREATE TABLE meta (
                 key TEXT PRIMARY KEY,

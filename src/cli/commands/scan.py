@@ -20,7 +20,9 @@ def scan_cmd(directory: str) -> None:
         directory (str): The directory to scan for photos.
     """
     try:
-        console.print(f"\n[bold cyan]Scanning: [/bold cyan] {directory}\n")
+        console.print(
+            f"\n[bold cyan]Scanning: [/bold cyan] [magenta]{directory}[/magenta]\n"
+        )
 
         path = validate_and_expand_path(directory)
 
@@ -46,11 +48,11 @@ def scan_cmd(directory: str) -> None:
         save_last_scan(directory, photo_files)
 
     except InvalidDirectoryError as e:
-        console.print(f"\n[red]Directory error: [/red] {e}")
+        console.print(f"\n[red]Directory error: [/red] {e}\n")
         raise typer.Exit(code=1)
     except PhotoOrganisationError as e:
-        console.print(f"\n[red]Organisation error: [/red] {e}")
+        console.print(f"\n[red]Organisation error: [/red] {e}\n")
         raise typer.Exit(code=1)
     except Exception as e:
-        console.print(f"\n[red]Unexpected error: [/red] {e}")
+        console.print(f"\n[red]Unexpected error: [/red] {e}\n")
         raise typer.Exit(code=1)

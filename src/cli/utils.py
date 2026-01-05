@@ -74,7 +74,7 @@ def save_last_scan(directory: str, photo_files: list) -> None:
         with open(scan_cache, "w") as f:
             json.dump({"directory": directory, "photo_files": path_strings}, f)
     except Exception as e:
-        console.print(f"[red]Error saving scan results: [/red] {e}")
+        console.print(f"\n[red]Error saving scan results: [/red] {e}")
 
 
 def load_last_scan() -> dict:
@@ -89,5 +89,5 @@ def load_last_scan() -> dict:
         data["photo_files"] = [Path(p) for p in data.get("photo_files", [])]
         return data
     except Exception as e:
-        console.print(f"[red]Error loading scan results: [/red] {e}")
+        console.print(f"\n[red]Error loading scan results: [/red] {e}")
         return {}

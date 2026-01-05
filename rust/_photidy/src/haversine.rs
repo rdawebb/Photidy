@@ -53,7 +53,7 @@ mod tests {
     fn test_equator_distance() {
         // One degree of longitude at the equator is approx 111km
         let distance = haversine(0.0, 0.0, 0.0, 1.0);
-        assert!((distance - 111.3).abs() < 2.0); 
+        assert!((distance - 111.3).abs() < 2.0);
     }
 
     #[test]

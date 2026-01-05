@@ -67,7 +67,7 @@ def _create_schema(conn) -> None:
             kind TEXT NOT NULL,
             importance REAL NOT NULL
         );
-                       
+
         CREATE TABLE meta (
             key TEXT PRIMARY KEY,
             value TEXT
@@ -142,7 +142,7 @@ def _park_filter(name: str, feature_code: str) -> bool:
     return False
 
 
-def _valid_location(name: str, feature_code: str, elevation: int | None) -> bool:
+def _valid_location(name: str, feature_code: str, elevation: int | str | None) -> bool:
     """Check if a location is valid based on name and feature attributes
 
     Args:

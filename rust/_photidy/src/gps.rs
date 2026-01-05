@@ -3,7 +3,7 @@ use exif::{Exif, Tag, In};
 pub fn extract_gps(exif: &Exif) -> Option<(f64, f64)> {
     let lat = extract_coord(exif, Tag::GPSLatitude, Tag::GPSLatitudeRef)?;
     let lon = extract_coord(exif, Tag::GPSLongitude, Tag::GPSLongitudeRef)?;
-    
+
     if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon) {
         return None;
     }

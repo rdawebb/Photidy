@@ -141,7 +141,7 @@ mod tests {
 
         assert!(result.is_ok());
         let candidates = result.unwrap();
-        
+
         for candidate in candidates {
             match candidate.name.as_str() {
                 "London" => assert_eq!(candidate.kind, "city"),
@@ -182,7 +182,7 @@ mod tests {
 
         assert!(result.is_ok());
         let candidates = result.unwrap();
-        
+
         let mut last_importance = std::f64::INFINITY;
         for candidate in candidates {
             assert!(candidate.importance <= last_importance);
