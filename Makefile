@@ -77,4 +77,4 @@ bundle:
 	@echo "✓ Application bundled successfully"
 
 run:
-	uv run python -m src.ui.main
+	./.venv/bin/python -m src.ui.main

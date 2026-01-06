@@ -278,7 +278,7 @@ class TestOrganisePhotos:
 
     @pytest.mark.parametrize(
         "setup_type",
-        ["empty_directory", "non_photo_files"],
+        ["empty_directory", "non_image_files"],
     )
     def test_empty_and_invalid_source_handling(
         self,
@@ -290,7 +290,7 @@ class TestOrganisePhotos:
     ):
         """Test processing directories with no valid photos."""
         # Setup source based on parameter
-        if setup_type == "non_photo_files":
+        if setup_type == "non_image_files":
             (valid_source_dir / "document.txt").write_text("text")
             (valid_source_dir / "archive.zip").write_text("zip")
             (valid_source_dir / "readme.md").write_text("markdown")

@@ -79,7 +79,7 @@ def _log_move(src: Path, dest: Path, undo_log_path: Optional[Path] = None) -> No
         logger.error(f"Failed to log move for {src} to {dest}: {e}")
 
 
-def scan_directory(source_dir: str) -> dict:
+def scan_directory(source_dir: str, progress_callback=None) -> dict:
     """Scan the directory for photos and return a summary, including list of photo files.
 
     Args:
@@ -94,12 +94,13 @@ def scan_directory(source_dir: str) -> dict:
 
     logger.debug(f"Scanning directory: {source}")
 
-    photo_files = []
+    image_files = []
     other_count = 0
     inaccessible_count = 0
+    file_counter = 0
 
     def _scan(dir: Path) -> None:
-        nonlocal other_count, inaccessible_count
+        nonlocal other_count, inaccessible_count, file_counter
         try:
             with os.scandir(dir) as entries:
                 for entry in entries:
@@ -108,7 +109,10 @@ def scan_directory(source_dir: str) -> dict:
                             if entry.name.startswith("."):
                                 continue
                             if entry.name.lower().endswith(SUPPORTED_FORMATS):
-                                photo_files.append(Path(entry.path))
+                                image_files.append(Path(entry.path))
+                                file_counter += 1
+                                if progress_callback:
+                                    progress_callback(file_counter, entry.name)
                             else:
                                 other_count += 1
                         except (OSError, PermissionError) as e:
@@ -131,14 +135,14 @@ def scan_directory(source_dir: str) -> dict:
         ) from e
 
     logger.debug(
-        f"Found {len(photo_files)} photos, {other_count} other files, and {inaccessible_count} inaccessible files."
+        f"Found {len(image_files)} photos, {other_count} other files, and {inaccessible_count} inaccessible files."
     )
 
     return {
-        "photos_count": len(photo_files),
+        "images_count": len(image_files),
         "other_count": other_count,
-        "total_files": len(photo_files) + other_count + inaccessible_count,
-        "photo_files": photo_files,
+        "total_files": len(image_files) + other_count + inaccessible_count,
+        "image_files": image_files,
         "inaccessible_count": inaccessible_count,
     }
 
@@ -148,7 +152,7 @@ def organise_photos(
     dest_dir: str,
     state_file: Optional[Path] = None,
     undo_log: Optional[Path] = None,
-    photo_files: list[Path] | None = None,
+    image_files: list[Path] | None = None,
 ) -> dict:
     """Organise photos from source directory to destination directory based on metadata.
 
@@ -157,7 +161,7 @@ def organise_photos(
         dest_dir (str): The destination directory to organise photos into.
         state_file (Path | None): Path to state file. If None, uses default.
         undo_log (Path | None): Path to undo log file. If None, uses default.
-        photo_files (list[Path] | None): List of photo files to organise. If None, scans source_dir.
+        image_files (list[Path] | None): List of photo files to organise. If None, scans source_dir.
 
     Returns:
         dict: Summary of the organisation process.
@@ -167,10 +171,10 @@ def organise_photos(
 
     _validate_directories(source, dest)
 
-    if photo_files is None:
-        files_to_process = scan_directory(source_dir)["photo_files"]
+    if image_files is None:
+        files_to_process = scan_directory(source_dir)["image_files"]
     else:
-        files_to_process = photo_files
+        files_to_process = image_files
 
     staging_dir = dest / STAGING_DIR
     try:

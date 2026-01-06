@@ -3,7 +3,7 @@
 from PySide6.QtWidgets import QPushButton
 
 
-class Button(QPushButton):
+class CustomButton(QPushButton):
     """Custom button widget for triggering actions"""
 
     def __init__(self, text: str, parent=None):

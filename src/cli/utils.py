@@ -51,7 +51,7 @@ def display_scan_results(summary: dict) -> None:
 
     for category, count in summary.items():
         if (
-            category == "photo_files"
+            category == "image_files"
             or (category == "inaccessible_count" and count == 0)
             or (category == "other_count" and count == 0)
         ):
@@ -62,17 +62,17 @@ def display_scan_results(summary: dict) -> None:
     console.print(table)
 
 
-def save_last_scan(directory: str, photo_files: list) -> None:
+def save_last_scan(directory: str, image_files: list) -> None:
     """Save the last scan results to a file.
 
     Args:
         directory (str): The directory that was scanned.
-        photo_files (list): The list of photo files found in the scan.
+        image_files (list): The list of photo files found in the scan.
     """
     try:
-        path_strings = [str(p) for p in photo_files]
+        path_strings = [str(p) for p in image_files]
         with open(scan_cache, "w") as f:
-            json.dump({"directory": directory, "photo_files": path_strings}, f)
+            json.dump({"directory": directory, "image_files": path_strings}, f)
     except Exception as e:
         console.print(f"\n[red]Error saving scan results: [/red] {e}")
 
@@ -86,7 +86,7 @@ def load_last_scan() -> dict:
     try:
         with open(scan_cache, "r") as f:
             data = json.load(f)
-        data["photo_files"] = [Path(p) for p in data.get("photo_files", [])]
+        data["image_files"] = [Path(p) for p in data.get("image_files", [])]
         return data
     except Exception as e:
         console.print(f"\n[red]Error loading scan results: [/red] {e}")

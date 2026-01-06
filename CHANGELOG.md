@@ -10,13 +10,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 
 - Expanded CLI with organise/undo commands.
-- Initial GUI structure and basic functionality.
+- New multi-view GUI with state management, and background threading.
+- Proper package structure for UI modules with exports
 - Mock DB path fixture for tests.
+- Type checking with 'ty' type checker
+- New 'make type' command for running type checks.
 
 ### Changed
 
 - Improved scan command output and return value.
 - Restructured Rust module for better maintainability.
+- Enhanced CLI output formatting with improved spacing & markup.
+- Improved code formatting consistency across Python & Rust files.
+- Upgrade pre-commit hooks configuration.
+- Standardised naming convention: photo_files → image_files across all modules
+- Improved pre-commit configuration with descriptive hook names
 
 ### Fixed
 

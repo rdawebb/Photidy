@@ -23,14 +23,14 @@ console = Console()
 def organise_cmd(
     source: Optional[str] = None,
     output: Optional[str] = None,
-    photo_files: Optional[list] = None,
+    image_files: Optional[list] = None,
 ) -> None:
     """Organise photos into folders based on their metadata"""
     last_scan = load_last_scan()
 
-    if not source and not photo_files and last_scan:
+    if not source and not image_files and last_scan:
         dir_path = last_scan.get("directory")
-        photo_files = last_scan.get("photo_files")
+        image_files = last_scan.get("image_files")
 
         if dir_path:
             response = console.input(
@@ -51,9 +51,9 @@ def organise_cmd(
         raise typer.Exit(code=1)
     source = str(source_path)
 
-    if not photo_files:
-        photo_files = scan_cmd(source)
-        if not photo_files:
+    if not image_files:
+        image_files = scan_cmd(source)
+        if not image_files:
             console.print(
                 "\n[red]Error: [/red] No photo files found for organisation\n"
             )
@@ -68,7 +68,7 @@ def organise_cmd(
 
     try:
         start_time = time.perf_counter()
-        organise_photos(source, output, photo_files=photo_files)
+        organise_photos(source, output, image_files=image_files)
         end_time = time.perf_counter()
 
     except InvalidDirectoryError as e:

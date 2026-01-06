@@ -32,8 +32,8 @@ def scan_cmd(directory: str) -> None:
 
         display_scan_results(scan_results)
 
-        photo_files = scan_results["photo_files"]
-        photo_count = scan_results["photos_count"]
+        image_files = scan_results["image_files"]
+        photo_count = scan_results["images_count"]
 
         if photo_count == 0:
             console.print(
@@ -45,7 +45,7 @@ def scan_cmd(directory: str) -> None:
                 f"\n[bold green]Scan complete - {photo_count} photos found in {end_time - start_time:.3f}s![/bold green]\n"
             )
 
-        save_last_scan(directory, photo_files)
+        save_last_scan(directory, image_files)
 
     except InvalidDirectoryError as e:
         console.print(f"\n[red]Directory error: [/red] {e}\n")
