@@ -10,21 +10,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 
 - Expanded CLI with organise/undo commands.
-- New multi-view GUI with state management, and background threading.
+- New multi-view GUI using `QStackedWidget` with separate view classes
+- Background threading support for async operations
+- Modular dialog system
+- Drag-and-drop folder selection support
+- SVG utility functions for dynamic icon rendering
+- UI constants module for centralised configuration
+- `typer-extensions` for extended CLI command functionality
 - Proper package structure for UI modules with exports
 - Mock DB path fixture for tests.
 - Type checking with 'ty' type checker
-- New 'make type' command for running type checks.
 
 ### Changed
 
+- Main window refactored from container-based to stacked widget
+- CLI migration from standard `typer` to `typer-extensions`
 - Improved scan command output and return value.
 - Restructured Rust module for better maintainability.
 - Enhanced CLI output formatting with improved spacing & markup.
 - Improved code formatting consistency across Python & Rust files.
-- Upgrade pre-commit hooks configuration.
+- Replaced `pre-commit` with `prek` for faster pre-commit execution
+- Upgraded pre-commit hooks configuration & naming
 - Standardised naming convention: photo_files → image_files across all modules
-- Improved pre-commit configuration with descriptive hook names
+- Dependency upgrades: rusqlite->0.38, maturin->1.11.5, ruff->0.14.11, and ty->0.0.12
+- Replace `Makefile` with `Justfile` for simpler task management
 
 ### Fixed
 

@@ -103,9 +103,9 @@ class ResultsView(QWidget):
     def set_results(self, results):
         """Set the results summary and details"""
         self.results_label.setText(
-            f"<b>Total files scanned:</b> {results['total_files']}<br>"
-            f"<b>Image files found:</b> {results['images_count']}<br>"
-            f"<b>Estimated organisation time:</b> ??? seconds"
+            f"<b>Total files scanned:</b> {results.get('total_files')}<br>"
+            f"<b>Image files found:</b> {results.get('images_count')}<br>"
+            f"<b>Estimated organisation time:</b> &lt; {results.get('estimated_time')} seconds"
         )
         if results.get("inaccessible"):
             self.inaccessible_widget.setVisible(True)

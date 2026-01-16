@@ -6,7 +6,7 @@ from PySide6.QtCore import QThread, Signal
 class ScannerThread(QThread):
     """Background thread for scanning directories"""
 
-    progress = Signal(int, str)  # current, current_file
+    progress = Signal(int, str)  # count, filename
     finished = Signal(dict)  # results
 
     def __init__(self, directory):
@@ -17,8 +17,8 @@ class ScannerThread(QThread):
         """Run the scanning process in a background thread"""
         from src.core.organiser import scan_directory
 
-        def progress_callback(current, current_file):
-            self.progress.emit(current, current_file)
+        def progress_callback(count, filename):
+            self.progress.emit(count, filename)
 
         results = scan_directory(self.directory, progress_callback)
 

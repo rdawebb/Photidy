@@ -23,13 +23,13 @@ STAGING_DIR = ".staging"
 
 
 def _load_state(state_file_path: Optional[Path] = None) -> dict:
-    """Load the organiser state from a JSON file.
+    """Load the organiser state from a JSON file
 
     Args:
-        state_file_path (Path | None): Path to state file. If None, uses default.
+        state_file_path (Path | None): Path to state file. If None, uses default
 
     Returns:
-        dict: The loaded state or empty dict if file doesn't exist or error occurs.
+        dict: The loaded state or empty dict if file doesn't exist or error occurs
     """
     if state_file_path is None:
         state_file_path = state_file
@@ -45,11 +45,11 @@ def _load_state(state_file_path: Optional[Path] = None) -> dict:
 
 
 def _save_state(state: dict, state_file_path: Optional[Path] = None) -> None:
-    """Save the organiser state to a JSON file.
+    """Save the organiser state to a JSON file
 
     Args:
-        state (dict): The state to save.
-        state_file_path (Path | None): Path to state file. If None, uses default.
+        state (dict): The state to save
+        state_file_path (Path | None): Path to state file. If None, uses default
     """
     if state_file_path is None:
         state_file_path = state_file
@@ -62,12 +62,12 @@ def _save_state(state: dict, state_file_path: Optional[Path] = None) -> None:
 
 
 def _log_move(src: Path, dest: Path, undo_log_path: Optional[Path] = None) -> None:
-    """Log a file move operation.
+    """Log a file move operation
 
     Args:
-        src (Path): Source file path.
-        dest (Path): Destination file path.
-        undo_log_path (Path | None): Path to undo log file. If None, uses default.
+        src (Path): Source file path
+        dest (Path): Destination file path
+        undo_log_path (Path | None): Path to undo log file. If None, uses default
     """
     if undo_log_path is None:
         undo_log_path = undo_log
@@ -80,14 +80,17 @@ def _log_move(src: Path, dest: Path, undo_log_path: Optional[Path] = None) -> No
 
 
 def scan_directory(source_dir: str, progress_callback=None) -> dict:
-    """Scan the directory for photos and return a summary, including list of photo files.
+    """Scan the directory for photos and return a summary, including list of photo files
 
     Args:
-        source_dir (str): The source directory to scan.
+        source_dir (str): The source directory to scan
+        progress_callback (callable | None): Optional callback for progress updates
 
     Returns:
         dict: A summary of the scan results
     """
+    import math
+
     source = Path(source_dir)
 
     _validate_directories(source)
@@ -97,10 +100,10 @@ def scan_directory(source_dir: str, progress_callback=None) -> dict:
     image_files = []
     other_count = 0
     inaccessible_count = 0
-    file_counter = 0
+    count = 0  # For UI reporting
 
     def _scan(dir: Path) -> None:
-        nonlocal other_count, inaccessible_count, file_counter
+        nonlocal other_count, inaccessible_count, count
         try:
             with os.scandir(dir) as entries:
                 for entry in entries:
@@ -110,9 +113,9 @@ def scan_directory(source_dir: str, progress_callback=None) -> dict:
                                 continue
                             if entry.name.lower().endswith(SUPPORTED_FORMATS):
                                 image_files.append(Path(entry.path))
-                                file_counter += 1
+                                count += 1
                                 if progress_callback:
-                                    progress_callback(file_counter, entry.name)
+                                    progress_callback(count, entry.name)
                             else:
                                 other_count += 1
                         except (OSError, PermissionError) as e:
@@ -138,12 +141,17 @@ def scan_directory(source_dir: str, progress_callback=None) -> dict:
         f"Found {len(image_files)} photos, {other_count} other files, and {inaccessible_count} inaccessible files."
     )
 
+    estimated_time = math.ceil(
+        len(image_files) * 0.005
+    )  # seconds per image estimate (placeholder)
+
     return {
         "images_count": len(image_files),
         "other_count": other_count,
         "total_files": len(image_files) + other_count + inaccessible_count,
         "image_files": image_files,
         "inaccessible_count": inaccessible_count,
+        "estimated_time": estimated_time,
     }
 
 
@@ -154,17 +162,17 @@ def organise_photos(
     undo_log: Optional[Path] = None,
     image_files: list[Path] | None = None,
 ) -> dict:
-    """Organise photos from source directory to destination directory based on metadata.
+    """Organise photos from source directory to destination directory based on metadata
 
     Args:
-        source_dir (str): The source directory containing photos.
-        dest_dir (str): The destination directory to organise photos into.
-        state_file (Path | None): Path to state file. If None, uses default.
-        undo_log (Path | None): Path to undo log file. If None, uses default.
-        image_files (list[Path] | None): List of photo files to organise. If None, scans source_dir.
+        source_dir (str): The source directory containing photos
+        dest_dir (str): The destination directory to organise photos into
+        state_file (Path | None): Path to state file - if None, uses default
+        undo_log (Path | None): Path to undo log file - if None, uses default
+        image_files (list[Path] | None): List of photo files to organise - if None, scans source_dir
 
     Returns:
-        dict: Summary of the organisation process.
+        dict: Summary of the organisation process
     """
     source = Path(source_dir)
     dest = Path(dest_dir)
@@ -284,13 +292,12 @@ def organise_photos(
 
 
 def _remove_empty_dirs(root: Path) -> None:
-    """Remove empty directories recursively up to stop (non-inclusive)
+    """Remove empty directories recursively
 
     Args:
         path (Path): The directory path to clean
-        stop (Path): The directory path to stop at (non-inclusive)
     """
-    for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+    for dirpath, _, _ in os.walk(root, topdown=False):
         path = Path(dirpath)
         for file in path.iterdir():
             if file.is_file() and file.name.startswith("."):
@@ -309,10 +316,10 @@ def _remove_empty_dirs(root: Path) -> None:
 
 
 def undo_organisation(undo_log_path: Optional[Path] = None) -> bool:
-    """Undo the last organisation operation.
+    """Undo the last organisation operation
 
     Args:
-        undo_log_path (Path | None): Path to undo log file. If None, uses default.
+        undo_log_path (Path | None): Path to undo log file - if None, uses default
     """
     if undo_log_path is None:
         undo_log_path = undo_log
@@ -381,14 +388,14 @@ def undo_organisation(undo_log_path: Optional[Path] = None) -> bool:
 
 
 def _validate_directories(source: Path, dest: Optional[Path] = None) -> None:
-    """Validate source and destination directories.
+    """Validate source and destination directories
 
     Args:
-        source (Path): The source directory.
-        dest (Path | None): The destination directory. If None, only source is validated.
+        source (Path): The source directory
+        dest (Path | None): The destination directory - if None, only source is validated
 
     Raises:
-        InvalidDirectoryError: If either directory is invalid or inaccessible.
+        InvalidDirectoryError: If either directory is invalid or inaccessible
     """
     if not source.exists():
         raise InvalidDirectoryError(f"Source directory does not exist: {source}")
@@ -411,14 +418,14 @@ def _validate_directories(source: Path, dest: Optional[Path] = None) -> None:
 
 
 def _get_unique_filename(directory, filename) -> str:
-    """Generate a unique filename in the specified directory.
+    """Generate a unique filename in the specified directory
 
     Args:
-        directory (str): The target directory.
-        filename (str): The original filename.
+        directory (str): The target directory
+        filename (str): The original filename
 
     Returns:
-        str: A unique filename.
+        str: A unique filename
     """
     try:
         path = Path(directory) / filename

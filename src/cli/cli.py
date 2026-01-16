@@ -1,17 +1,17 @@
 """CLI interface for Photidy application"""
 
-import typer
+from typer_extensions import ExtendedTyper
 
 from .commands.organise import organise_cmd
 from .commands.scan import scan_cmd
 from .commands.undo import undo_cmd
 
-app = typer.Typer(help="Photidy CLI - Photo Organisation Made Easy")
+app = ExtendedTyper(help="Photidy CLI - Photo Organisation Made Easy")
 
 
-@app.command()
+@app.command_with_aliases(aliases=["s", "sc", "find"])
 def scan(
-    directory: str = typer.Argument(
+    directory: str = app.Argument(
         ..., help="Directory to scan for photos", metavar="DIRECTORY"
     ),
 ) -> None:
@@ -19,12 +19,12 @@ def scan(
     scan_cmd(directory)
 
 
-@app.command()
-def organise(
-    source: str = typer.Argument(
+@app.command_with_aliases(aliases=["t", "org", "sort"])
+def tidy(
+    source: str = app.Argument(
         None, help="Source directory containing photos", metavar="SOURCE"
     ),
-    output: str = typer.Argument(
+    output: str = app.Argument(
         None, help="Output directory for organised photos", metavar="DEST"
     ),
 ) -> None:
@@ -32,7 +32,7 @@ def organise(
     organise_cmd(source, output)
 
 
-@app.command()
+@app.command_with_aliases(aliases=["u", "un", "reset"])
 def undo() -> None:
     """Undo the last photo organisation operation"""
     undo_cmd()

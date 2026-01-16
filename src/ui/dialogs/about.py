@@ -5,7 +5,7 @@ from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout
 
 from src import __version__
-from src.ui.constants import ABOUT_COPYRIGHT, ABOUT_ICON_PATH
+from src.ui.utils.constants import ABOUT_COPYRIGHT, ABOUT_ICON_PATH
 
 
 class AboutDialog(QDialog):

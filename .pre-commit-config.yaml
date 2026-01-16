@@ -13,43 +13,38 @@ repos:
         name: Check for merge conflicts
       - id: check-yaml
         name: Check YAML files
+      - id: detect-private-key
+        name: Check for private keys
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.10
+  - repo: local
     hooks:
       - id: ruff-check
-        args: ["--fix"]
         name: Check linting
+        entry: uvx ruff check --fix src tests scripts runtime
+        language: system
+        types: [python]
+
       - id: ruff-format
         name: Check formatting
+        entry: uvx ruff format src tests scripts runtime
+        language: system
+        types: [python]
 
-  - repo: local
-    hooks:
-    - id: ty-type-check
-      name: Check type safety
-      entry: ty check src tests
-      language: system
-      types: [python]
+      - id: ty-type-check
+        name: Check type safety
+        entry: uvx ty check src tests scripts runtime
+        language: system
+        types: [python]
 
-  - repo: https://github.com/awslabs/git-secrets
-    rev: master
-    hooks:
-      - id: git-secrets
-        name: Check for secrets
-
-  - repo: local
-    hooks:
       - id: cargo-check
         name: Check Rust code compiles
-        entry: python scripts/cargo_check.py
+        entry: uvx python scripts/cargo_check.py
         language: system
         types: [rust]
         pass_filenames: false
 
-  - repo: local
-    hooks:
-    - id: python-syntax-check
-      name: Check for Python syntax errors
-      entry: python -m py_compile
-      language: system
-      types: [python]
+      - id: python-syntax-check
+        name: Check for Python syntax errors
+        entry: uvx python -m py_compile
+        language: system
+        types: [python]

@@ -1,7 +1,7 @@
 """Main application window"""
 
 from PySide6.QtCore import QSettings, Qt
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.ui.constants import (
+from src.ui.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
+from src.ui.threads import OrganiserThread, ScannerThread
+from src.ui.utils.constants import (
     APP_TITLE,
     MENU_ABOUT,
     MENU_EXIT,
@@ -22,8 +24,7 @@ from src.ui.constants import (
     SHORTCUT_EXIT,
     SHORTCUT_SETTINGS,
 )
-from src.ui.dialogs import AboutDialog, ConfirmDialog, SettingsDialog
-from src.ui.threads import OrganiserThread, ScannerThread
+from src.ui.utils.svg_utils import svg_icon_with_palette_color
 from src.ui.views import ProgressView, ResultsView, SetupView, SummaryView
 from src.ui.widgets import CustomButton
 
@@ -77,6 +78,20 @@ class MainWindow(QMainWindow):
         # Navigation buttons
         self.back_button = CustomButton("Back")
         self.next_button = CustomButton("Next")
+
+        palette = self.back_button.palette()
+        back_icon = svg_icon_with_palette_color(
+            "src/ui/assets/inline-left.svg",
+            palette.color(QPalette.ColorRole.ButtonText),
+        )
+        forward_icon = svg_icon_with_palette_color(
+            "src/ui/assets/inline-right.svg",
+            palette.color(QPalette.ColorRole.ButtonText),
+        )
+        self.back_button.setIcon(back_icon)
+        self.next_button.setIcon(forward_icon)
+        self.next_button.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+
         self.back_button.clicked.connect(self._go_back)
         self.next_button.clicked.connect(self._go_forward)
 
@@ -115,9 +130,8 @@ class MainWindow(QMainWindow):
         # Misc settings
         self.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents)
         self.resize(600, 400)
-        self._center_window()
 
-    def _center_window(self):
+    def center_window(self):
         """Center the window on screen"""
         screen = self.screen()
         screen_geometry = screen.availableGeometry()
@@ -198,9 +212,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.statusBar().showMessage(f"Failed to start scan: {e}")
 
-    def update_scan_progress(self, current, filename):
+    def update_scan_progress(self, count, filename):
         """Update the progress view during scanning"""
-        self.progress_view.set_status(f"Scanned... {current} files")
+        self.progress_view.set_status(f"Scanned... {count} files")
         self.progress_view.set_current_file(filename)
 
     def scan_completed(self, results):
