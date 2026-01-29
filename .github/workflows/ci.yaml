@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test (${{ matrix.os }})
@@ -38,16 +41,16 @@ jobs:
 
       - name: Install Python deps
         run: |
-          make install-dev
+          uv sync --all-extras
 
       - name: Build Rust + Python extension
         run: |
-          make build-rust
+          uv run python scripts/build_rust.py
 
       - name: Run Rust tests
         run: |
-          make test-rust
+          uv run python scripts/test_rust.py
 
       - name: Run Python tests
         run: |
-          make test-python
+          uv run pytest -v tests --no-cov

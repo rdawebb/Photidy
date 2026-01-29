@@ -9,7 +9,7 @@ from .commands.undo import undo_cmd
 app = ExtendedTyper(help="Photidy CLI - Photo Organisation Made Easy")
 
 
-@app.command_with_aliases(aliases=["s", "sc", "find"])
+@app.command_with_aliases(aliases=["s", "sc"])
 def scan(
     directory: str = app.Argument(
         ..., help="Directory to scan for photos", metavar="DIRECTORY"
@@ -19,8 +19,8 @@ def scan(
     scan_cmd(directory)
 
 
-@app.command_with_aliases(aliases=["t", "org", "sort"])
-def tidy(
+@app.command_with_aliases(aliases=["o", "org"])
+def organise(
     source: str = app.Argument(
         None, help="Source directory containing photos", metavar="SOURCE"
     ),
@@ -32,7 +32,7 @@ def tidy(
     organise_cmd(source, output)
 
 
-@app.command_with_aliases(aliases=["u", "un", "reset"])
+@app.command_with_aliases(aliases=["u", "un"])
 def undo() -> None:
     """Undo the last photo organisation operation"""
     undo_cmd()

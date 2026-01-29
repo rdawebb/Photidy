@@ -32,8 +32,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Replaced `pre-commit` with `prek` for faster pre-commit execution
 - Upgraded pre-commit hooks configuration & naming
 - Standardised naming convention: photo_files → image_files across all modules
-- Dependency upgrades: rusqlite->0.38, maturin->1.11.5, ruff->0.14.11, and ty->0.0.12
-- Replace `Makefile` with `Justfile` for simpler task management
+- Dependency upgrades: rusqlite->0.38, maturin->1.11.5, ruff->0.14.14, and ty->0.0.14
+- Replaced `Makefile` with `Justfile` for simpler task management
 
 ### Fixed
 
