@@ -32,7 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Replaced `pre-commit` with `prek` for faster pre-commit execution
 - Upgraded pre-commit hooks configuration & naming
 - Standardised naming convention: photo_files → image_files across all modules
-- Dependency upgrades: rusqlite->0.38, maturin->1.12.6, prek->0.3.8, pytest-cov->7.1.0, ruff->0.15.8, rust-just->1.48.0, and ty->0.0.26
+- Dependency upgrades: rusqlite->0.38, maturin->1.12.6, prek->0.3.8, pytest-cov->7.1.0, ruff->0.15.8, rust-just->1.48.1, and ty->0.0.26
 - Replaced `Makefile` with `Justfile` for simpler task management
 
 ### Fixed
