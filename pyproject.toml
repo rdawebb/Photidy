@@ -19,13 +19,13 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "icecream>=2.2.0,<3.0.0",
-    "maturin>=1.12.6,<2.0",
-    "prek>=0.3.8,<1.0.0",
-    "pytest>=9.0.2,<10.0.0",
+    "maturin>=1.13.1,<2.0",
+    "prek>=0.3.10,<1.0.0",
+    "pytest>=9.0.3,<10.0.0",
     "pytest-cov>=7.1.0,<8.0.0",
-    "ruff>=0.15.9,<1.0.0",
-    "rust-just>=1.48.1,<2.0.0",
-    "ty>=0.0.28,<0.1.0",
+    "ruff>=0.15.11,<1.0.0",
+    "rust-just>=1.50.0,<2.0.0",
+    "ty>=0.0.32,<0.1.0",
 ]
 
 [project.scripts]
