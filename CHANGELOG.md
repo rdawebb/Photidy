@@ -35,8 +35,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Replaced `pre-commit` with `prek` for faster pre-commit execution
 - Upgraded pre-commit hooks configuration & naming
 - Standardised naming convention: photo_files → image_files across all modules
-- Dependency upgrades: icecream->2.2.0, maturin->1.13.1, prek->0.3.10, pyside->6.11.0 pytest->9.0.3, pytest-cov->7.1.0, ruff->0.15.11, rusqlite->0.38, rust-just->1.50.0, and ty->0.0.32
 - Replaced `Makefile` with `Justfile` for simpler task management
+- Dependency upgrades:
+    - icecream->2.2.0
+    - maturin->1.13.1
+    - prek->0.4.0
+    - pygments->2.20.0
+    - pyside->6.11.0
+    - pytest->9.0.3
+    - pytest-cov->7.1.0
+    - ruff->0.15.11
+    - rusqlite->0.38
+    - rust-just->1.50.0
+    - ty->0.0.32
 
 ### Fixed
 
