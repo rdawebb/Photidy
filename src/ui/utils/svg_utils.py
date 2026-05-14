@@ -1,6 +1,6 @@
 """SVG utility functions"""
 
-from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtCore import QByteArray, Qt, QSize
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
@@ -15,15 +15,15 @@ def svg_icon_with_palette_color(svg_path: str, color: QColor) -> QIcon:
     Returns:
         QIcon: The generated icon from the SVG.
     """
-    with open(svg_path, "r", encoding="utf-8") as f:
-        svg_data = f.read()
-    svg_data = svg_data.replace("currentColor", color.name())
+    with open(file=svg_path, mode="r", encoding="utf-8") as f:
+        svg_data: str = f.read()
+    svg_data: str = svg_data.replace("currentColor", color.name())
 
     # Render SVG to pixmap
-    renderer = QSvgRenderer(QByteArray(svg_data.encode("utf-8")))
-    size = renderer.defaultSize()
+    renderer = QSvgRenderer(QByteArray(svg_data.encode(encoding="utf-8")))
+    size: QSize = renderer.defaultSize()
     pixmap = QPixmap(size)
-    pixmap.fill(Qt.GlobalColor.transparent)
+    pixmap.fill(fillColor=Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     renderer.render(painter)
     painter.end()

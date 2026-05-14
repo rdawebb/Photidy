@@ -8,10 +8,10 @@ OUTPUT_DIR = "rust/photidy/data"
 OUTPUT_DB = f"places_v{DB_VERSION}.db"
 DATA_SOURCES = "scripts/data"
 
-CITIES_ZIP = Path(DATA_SOURCES) / "cities1000.zip"
-ALLCOUNTRIES_ZIP = Path(DATA_SOURCES) / "allCountries.zip"
+CITIES_ZIP: Path = Path(DATA_SOURCES) / "cities1000.zip"
+ALLCOUNTRIES_ZIP: Path = Path(DATA_SOURCES) / "allCountries.zip"
 
-CITIES_COLUMNS = {
+CITIES_COLUMNS: dict[str, int] = {
     "name": 1,
     "latitude": 4,
     "longitude": 5,
@@ -21,7 +21,7 @@ CITIES_COLUMNS = {
     "population": 14,
 }
 
-LANDMARKS_COLUMNS = {
+LANDMARKS_COLUMNS: dict[str, int] = {
     "name": 1,
     "latitude": 4,
     "longitude": 5,
@@ -31,7 +31,7 @@ LANDMARKS_COLUMNS = {
     "elevation": 15,
 }
 
-ALLOWED_FEATURE_CODES = {
+ALLOWED_FEATURE_CODES: set[str] = {
     # Major landmarks
     "MNMT",  # monuments
     "MUS",  # museums
@@ -58,14 +58,14 @@ ALLOWED_FEATURE_CODES = {
     "HSTS",  # historic sites
 }
 
-EXCLUDED_FEATURE_PREFIXES = {
+EXCLUDED_FEATURE_PREFIXES: set[str] = {
     "S.BLDG",  # buildings
     "S.SHOP",  # shops
     "S.OFF",  # offices
     "S.TRANS",  # transportation
 }
 
-FEATURE_CODE_IMPORTANCE = {
+FEATURE_CODE_IMPORTANCE: dict[str, float] = {
     "MNMT": 4.8,
     "CATH": 4.8,
     "CAST": 4.7,
@@ -87,14 +87,14 @@ FEATURE_CODE_IMPORTANCE = {
     "PRK": 3.8,
 }
 
-CLASS_REGEXES = {
+CLASS_REGEXES: dict[str, str] = {
     "CH": r"^(Church|St\.?|Saint|San|Santa|Notre Dame|Église|Kirche)\b",
     "MT": r"^Mount\s+\w+$",
     "PRK": r"\b(Park|Playground|Recreation Ground|Recreation Area)$",
     "RUIN": r"^(Ruins of|Site of)\b",
 }
 
-MISC_REGEXES = {
+MISC_REGEXES: set[str] = {
     r"\b(District|Sector|Zone|Ward|Block|Lot|Parcel)\b",
     r"\b(North|South|East|West)$",
     r"\b(No\.?\s*\d+|\d+(st|nd|rd|th))\b",
@@ -104,15 +104,19 @@ MISC_REGEXES = {
     r"\b(Site|Facility|Complex)\b",
 }
 
-COMPILED_CLASS_REGEXES = {
-    k: re.compile(pattern, re.IGNORECASE) for k, pattern in CLASS_REGEXES.items()
+COMPILED_CLASS_REGEXES: dict[str, re.Pattern[str]] = {
+    k: re.compile(pattern, flags=re.IGNORECASE) for k, pattern in CLASS_REGEXES.items()
 }
 
-COMPILED_MISC_REGEXES = [re.compile(r, re.IGNORECASE) for r in MISC_REGEXES]
+COMPILED_MISC_REGEXES: list[re.Pattern[str]] = [
+    re.compile(pattern=r, flags=re.IGNORECASE) for r in MISC_REGEXES
+]
 
-PARK_REGEX = re.compile(r"^(City|Town|Municipal|Public)\s+Park$", re.IGNORECASE)
+PARK_REGEX: re.Pattern[str] = re.compile(
+    pattern=r"^(City|Town|Municipal|Public)\s+Park$", flags=re.IGNORECASE
+)
 
-FAMOUS_PARK_KEYWORDS = {
+FAMOUS_PARK_KEYWORDS: set[str] = {
     "central",
     "hyde",
     "golden gate",

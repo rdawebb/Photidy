@@ -20,11 +20,11 @@ class FolderSelector(QWidget):
         super().__init__(parent)
         self._layout = QHBoxLayout(self)
 
-        self.line_edit = QLineEdit(self)
+        self.line_edit = QLineEdit(parent=self)
         self.line_edit.setClearButtonEnabled(True)
         self.line_edit.setPlaceholderText("Enter a folder path")
 
-        self.browse_button = CustomButton("Browse", self)
+        self.browse_button = CustomButton(text="Browse", parent=self)
         self.browse_button.setToolTip("Browse for folder")
         self._layout.addWidget(self.line_edit)
         self._layout.addWidget(self.browse_button)
@@ -38,7 +38,9 @@ class FolderSelector(QWidget):
 
     def open_folder_dialog(self):
         """Open a folder selection dialog"""
-        folder = QFileDialog.getExistingDirectory(self, "Select Folder", "")
+        folder: str = QFileDialog.getExistingDirectory(
+            parent=self, caption="Select Folder", dir=""
+        )
         if folder:
             self.line_edit.setText(folder)
             self.folderSelected.emit(folder)

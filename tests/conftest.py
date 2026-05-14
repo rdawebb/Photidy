@@ -7,7 +7,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-
 _temp_db_path = None
 
 
@@ -17,10 +16,10 @@ def pytest_configure(config):
 
     global _temp_db_path
 
-    temp_dir = tempfile.mkdtemp()
+    temp_dir: str = tempfile.mkdtemp()
     db_file_path = f"{temp_dir}/places_v0.1.db"
 
-    with open(db_file_path, "wb") as f:
+    with open(file=db_file_path, mode="wb") as f:
         f.write(b"mock database content")
 
     _temp_db_path = db_file_path
@@ -30,7 +29,7 @@ def pytest_configure(config):
 
         return Path(_temp_db_path)
 
-    patcher = patch("runtime.paths.db_path", side_effect=mock_db_path_func)
+    patcher = patch(target="runtime.paths.db_path", side_effect=mock_db_path_func)
     patcher.start()
 
 
@@ -55,7 +54,7 @@ def dest_dir(tmp_path):
 @pytest.fixture
 def valid_source_dir(tmp_path):
     """Create a valid source directory."""
-    source = tmp_path / "source"
+    source: Path = tmp_path / "source"
     source.mkdir()
     return source
 
@@ -63,7 +62,7 @@ def valid_source_dir(tmp_path):
 @pytest.fixture
 def valid_dest_dir(tmp_path):
     """Create a valid destination directory."""
-    dest = tmp_path / "destination"
+    dest: Path = tmp_path / "destination"
     dest.mkdir()
     return dest
 
@@ -98,21 +97,21 @@ def mock_exif_tags():
 @pytest.fixture
 def mock_image_file(tmp_path):
     """Create a mock image file."""
-    image_file = tmp_path / "test_image.jpg"
-    image_file.write_bytes(b"fake image data")
+    image_file: Path = tmp_path / "test_image.jpg"
+    image_file.write_bytes(data=b"fake image data")
     return image_file
 
 
 @pytest.fixture
 def suppress_logging():
     """Suppress logging during tests."""
-    logging.getLogger("src.core.metadata").setLevel(logging.CRITICAL)
-    logging.getLogger("src.core.organiser").setLevel(logging.CRITICAL)
-    logging.getLogger("src.utils.logger").setLevel(logging.CRITICAL)
+    logging.getLogger(name="src.core.metadata").setLevel(logging.CRITICAL)
+    logging.getLogger(name="src.core.organiser").setLevel(logging.CRITICAL)
+    logging.getLogger(name="src.utils.logger").setLevel(logging.CRITICAL)
     yield
-    logging.getLogger("src.core.metadata").setLevel(logging.DEBUG)
-    logging.getLogger("src.core.organiser").setLevel(logging.DEBUG)
-    logging.getLogger("src.utils.logger").setLevel(logging.DEBUG)
+    logging.getLogger(name="src.core.metadata").setLevel(logging.DEBUG)
+    logging.getLogger(name="src.core.organiser").setLevel(logging.DEBUG)
+    logging.getLogger(name="src.utils.logger").setLevel(logging.DEBUG)
 
 
 @pytest.fixture
@@ -122,10 +121,10 @@ def mock_db_path(tmp_path):
     Note: This fixture is for cases where you need a fresh temporary database.
     By default, db_path is already patched globally via pytest_configure hook.
     """
-    db_file = tmp_path / "places_v0.1.db"
-    db_file.write_bytes(b"mock database content")
+    db_file: Path = tmp_path / "places_v0.1.db"
+    db_file.write_bytes(data=b"mock database content")
 
-    with patch("runtime.paths.db_path", return_value=db_file):
+    with patch(target="runtime.paths.db_path", return_value=db_file):
         yield db_file
 
 
@@ -178,7 +177,9 @@ def mock_image_info_complete():
     """Fixture providing complete image info for testing."""
     return {
         "path": "test.jpg",
-        "timestamp": datetime(2024, 1, 15, 14, 30, 45),
+        "timestamp": datetime(
+            year=2024, month=1, day=15, hour=14, minute=30, second=45
+        ),
         "location": "New York, New York, US",
     }
 
@@ -207,9 +208,9 @@ def error_classes_data():
     from src.utils.errors import (
         InvalidDirectoryError,
         InvalidPhotoFormatError,
+        PhotidyError,
         PhotoMetadataError,
         PhotoOrganisationError,
-        PhotidyError,
     )
 
     return [

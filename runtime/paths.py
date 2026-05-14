@@ -12,8 +12,8 @@ def runtime_root() -> Path:
     Returns:
         Path: The root directory path
     """
-    if getattr(sys, "frozen", False):
-        return Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
     return Path(__file__).resolve().parents[1]
 
 

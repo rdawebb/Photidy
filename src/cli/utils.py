@@ -26,7 +26,7 @@ def validate_and_expand_path(path_str: str) -> Path:
         typer.BadParameter: If the path is invalid or not a directory.
     """
     try:
-        path = Path(path_str).expanduser().resolve()
+        path: Path = Path(path_str).expanduser().resolve()
         return path
 
     except Exception as e:
@@ -56,8 +56,8 @@ def display_scan_results(summary: dict) -> None:
             or (category == "other_count" and count == 0)
         ):
             continue
-        c = category.replace("_", " ").replace("count", "").title()
-        table.add_row(c, str(count))
+        c: str = category.replace("_", " ").replace("count", "").title()
+        table.add_row(c, str(object=count))
 
     console.print(table)
 
@@ -70,9 +70,9 @@ def save_last_scan(directory: str, image_files: list) -> None:
         image_files (list): The list of photo files found in the scan.
     """
     try:
-        path_strings = [str(p) for p in image_files]
-        with open(scan_cache, "w") as f:
-            json.dump({"directory": directory, "image_files": path_strings}, f)
+        path_strings: list[str] = [str(object=p) for p in image_files]
+        with open(file=scan_cache, mode="w") as f:
+            json.dump(obj={"directory": directory, "image_files": path_strings}, fp=f)
     except Exception as e:
         console.print(f"\n[red]Error saving scan results: [/red] {e}")
 
@@ -84,8 +84,8 @@ def load_last_scan() -> dict:
         dict: The last scan results, including the directory and photo files.
     """
     try:
-        with open(scan_cache, "r") as f:
-            data = json.load(f)
+        with open(file=scan_cache, mode="r") as f:
+            data: dict = json.load(fp=f)
         data["image_files"] = [Path(p) for p in data.get("image_files", [])]
         return data
     except Exception as e:

@@ -1,12 +1,16 @@
 """Main application window"""
 
-from PySide6.QtCore import QSettings, Qt
-from PySide6.QtGui import QAction, QPalette
+from pathlib import Path
+
+from PySide6.QtCore import QRect, QSettings, Qt
+from PySide6.QtGui import QAction, QIcon, QPalette, QScreen
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QHBoxLayout,
     QMainWindow,
+    QMenu,
+    QMenuBar,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -35,12 +39,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_TITLE)
 
         # Set up the native app menubar
-        menubar = self.menuBar()
+        menubar: QMenuBar = self.menuBar()
         menubar.clear()
 
         # File menu
-        file_menu = menubar.addMenu(MENU_FILE)
-        self.exit_action = QAction(MENU_EXIT, self)
+        file_menu: QMenu = menubar.addMenu(MENU_FILE)
+        self.exit_action = QAction(MENU_EXIT, parent=self)
         self.exit_action.setShortcut(SHORTCUT_EXIT)
         self.exit_action.triggered.connect(self._on_exit)
         self.exit_action.setToolTip("Exit the app")
@@ -48,7 +52,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.exit_action)
 
         # Preferences/Settings
-        self.prefs_action = QAction(MENU_SETTINGS, self)
+        self.prefs_action = QAction(MENU_SETTINGS, parent=self)
         self.prefs_action.setMenuRole(QAction.MenuRole.PreferencesRole)
         self.prefs_action.setShortcut(SHORTCUT_SETTINGS)
         self.prefs_action.triggered.connect(self._on_preferences)
@@ -57,8 +61,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.prefs_action)
 
         # Help menu
-        help_menu = menubar.addMenu(MENU_HELP)
-        self.about_action = QAction(MENU_ABOUT, self)
+        help_menu: QMenu = menubar.addMenu(MENU_HELP)
+        self.about_action = QAction(MENU_ABOUT, parent=self)
         self.about_action.setMenuRole(QAction.MenuRole.AboutRole)
         self.about_action.triggered.connect(self._on_about)
         self.about_action.setToolTip("Show information about Photidy")
@@ -76,17 +80,17 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
 
         # Navigation buttons
-        self.back_button = CustomButton("Back")
-        self.next_button = CustomButton("Next")
+        self.back_button = CustomButton(text="Back")
+        self.next_button = CustomButton(text="Next")
 
-        palette = self.back_button.palette()
-        back_icon = svg_icon_with_palette_color(
-            "src/ui/assets/inline-left.svg",
-            palette.color(QPalette.ColorRole.ButtonText),
+        palette: QPalette = self.back_button.palette()
+        back_icon: QIcon = svg_icon_with_palette_color(
+            svg_path="src/ui/assets/inline-left.svg",
+            color=palette.color(QPalette.ColorRole.ButtonText),
         )
-        forward_icon = svg_icon_with_palette_color(
-            "src/ui/assets/inline-right.svg",
-            palette.color(QPalette.ColorRole.ButtonText),
+        forward_icon: QIcon = svg_icon_with_palette_color(
+            svg_path="src/ui/assets/inline-right.svg",
+            color=palette.color(QPalette.ColorRole.ButtonText),
         )
         self.back_button.setIcon(back_icon)
         self.next_button.setIcon(forward_icon)
@@ -113,7 +117,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.summary_view)
 
         self.stacked_widget.currentChanged.connect(self._nav_visibility)
-        self._nav_visibility(self.stacked_widget.currentIndex())
+        self._nav_visibility(index=self.stacked_widget.currentIndex())
 
         self.setup_view.scan_requested.connect(self.start_scan)
         self.results_view.organise_requested.connect(self.start_organise)
@@ -133,9 +137,9 @@ class MainWindow(QMainWindow):
 
     def center_window(self):
         """Center the window on screen"""
-        screen = self.screen()
-        screen_geometry = screen.availableGeometry()
-        window_geometry = self.frameGeometry()
+        screen: QScreen = self.screen()
+        screen_geometry: QRect = screen.availableGeometry()
+        window_geometry: QRect = self.frameGeometry()
         window_geometry.moveCenter(screen_geometry.center())
         self.move(window_geometry.topLeft())
 
@@ -164,29 +168,29 @@ class MainWindow(QMainWindow):
 
     def _on_preferences(self):
         """Handle the preferences menu item"""
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(parent=self)
         if dialog.exec():
             self._apply_settings()
 
     def _apply_settings(self):
         """Apply the settings from the preferences dialog (placeholder)"""
-        settings = QSettings("Photidy", "Settings")
+        settings = QSettings("Photidy", application="Settings")
         settings.setValue("some_setting", "some_value")
 
     def _on_about(self):
         """Handle the about menu item"""
-        dialog = AboutDialog(self)
+        dialog = AboutDialog(parent=self)
         dialog.exec()
 
     def _go_back(self):
         """Handle the back button click"""
-        idx = self.stacked_widget.currentIndex()
+        idx: int = self.stacked_widget.currentIndex()
         if idx > 0:
             self.stacked_widget.setCurrentIndex(idx - 1)
 
     def _go_forward(self):
         """Handle the forward button click"""
-        idx = self.stacked_widget.currentIndex()
+        idx: int = self.stacked_widget.currentIndex()
         if idx < self.stacked_widget.count() - 1:
             self.stacked_widget.setCurrentIndex(idx + 1)
 
@@ -199,11 +203,11 @@ class MainWindow(QMainWindow):
         """Start the directory scanning process"""
         try:
             self.stacked_widget.setCurrentWidget(self.progress_view)
-            self.progress_view.set_status("Scanning...")
-            self.progress_view.set_progress(0, 0)  # Spinner mode
-            self.progress_view.set_current_file("")
+            self.progress_view.set_status(text="Scanning...")
+            self.progress_view.set_progress(value=0, maximum=0)  # Spinner mode
+            self.progress_view.set_current_file(filename="")
 
-            self.scanner_thread = ScannerThread(source_dir)
+            self.scanner_thread = ScannerThread(directory=source_dir)
             self.scanner_thread.progress.connect(self.update_scan_progress)
             self.scanner_thread.finished.connect(self.scan_completed)
             self.scanner_thread.start()
@@ -214,13 +218,13 @@ class MainWindow(QMainWindow):
 
     def update_scan_progress(self, count, filename):
         """Update the progress view during scanning"""
-        self.progress_view.set_status(f"Scanned... {count} files")
+        self.progress_view.set_status(text=f"Scanned... {count} files")
         self.progress_view.set_current_file(filename)
 
     def scan_completed(self, results):
         """Handle the completion of the scan"""
         try:
-            self.scan_results = results
+            self.scan_results: dict = results
             self.results_view.set_results(results)
             self.stacked_widget.setCurrentWidget(self.results_view)
             self.statusBar().showMessage(
@@ -234,19 +238,19 @@ class MainWindow(QMainWindow):
     def start_organise(self, options):
         """Start the photo organising process"""
         try:
-            output_dir = options["output_dir"]
-            dialog = ConfirmDialog(self.scan_results, options, output_dir, self)
+            output_dir: Path = options["output_dir"]
+            dialog = ConfirmDialog(self.scan_results, options, output_dir, parent=self)
             if dialog.exec() != QDialog.DialogCode.Accepted:
-                return
+                return  # User cancelled
 
             self.stacked_widget.setCurrentWidget(self.progress_view)
-            self.progress_view.set_status("Organising photos...")
-            file_paths = self.scan_results.get("image_files", [])
-            self.progress_view.set_progress(0, len(file_paths))
-            self.progress_view.set_current_file("")
+            self.progress_view.set_status(text="Organising photos...")
+            file_paths: list[Path] = self.scan_results.get("image_files", [])
+            self.progress_view.set_progress(value=0, maximum=len(file_paths))
+            self.progress_view.set_current_file(filename="")
 
             self.organiser_thread = OrganiserThread(
-                file_paths, options["output_dir"], options
+                file_paths, output_dir=output_dir, options=options
             )
             self.organiser_thread.progress.connect(self.update_organise_progress)
             self.organiser_thread.finished.connect(self.organise_completed)
@@ -258,8 +262,8 @@ class MainWindow(QMainWindow):
 
     def update_organise_progress(self, current, total, filename):
         """Update the progress view during organising"""
-        self.progress_view.set_progress(current, total)
-        self.progress_view.set_status(f"Processing {current} of {total} photos")
+        self.progress_view.set_progress(value=current, maximum=total)
+        self.progress_view.set_status(text=f"Processing {current} of {total} photos")
         self.progress_view.set_current_file(filename)
 
     def organise_completed(self, results):
@@ -278,22 +282,22 @@ class MainWindow(QMainWindow):
         import platform
         import subprocess
 
-        output_dir = self.results_view.folder_selector.get_selected_folder()
+        output_dir: str = self.results_view.folder_selector.get_selected_folder()
         if output_dir:
             try:
                 if platform.system() == "Windows":
-                    subprocess.Popen(f'explorer "{output_dir}"')
+                    subprocess.Popen(args=f'explorer "{output_dir}"')
                 elif platform.system() == "Darwin":
-                    subprocess.Popen(["open", output_dir])
+                    subprocess.Popen(args=["open", output_dir])
                 else:
-                    subprocess.Popen(["xdg-open", output_dir])
+                    subprocess.Popen(args=["xdg-open", output_dir])
 
             except Exception as e:
                 self.statusBar().showMessage(f"Failed to open folder: {e}")
 
     def reset_to_start(self):
         """Reset the application to the initial state"""
-        self.scan_results = {}
+        self.scan_results: dict = {}
         self.setup_view.folder_selector.clear_selection()
         self.results_view.folder_selector.clear_selection()
         self.stacked_widget.setCurrentWidget(self.setup_view)

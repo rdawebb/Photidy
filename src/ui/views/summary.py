@@ -1,7 +1,7 @@
 """View for displaying the organisation summary"""
 
-from PySide6.QtCore import Signal, Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 
 class SummaryView(QWidget):
@@ -24,7 +24,8 @@ class SummaryView(QWidget):
         layout.addWidget(success_icon)
 
         success_title = QLabel("Organisation Complete!")
-        # ... set font, alignment, etc. ...
+        success_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        success_title.setStyleSheet("font-size: 24px; font-weight: bold;")
         layout.addWidget(success_title)
 
         # Summary details

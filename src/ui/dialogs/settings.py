@@ -73,18 +73,20 @@ class SettingsDialog(QDialog):
 
     def load_settings(self):
         """Load the saved settings"""
-        settings = QSettings("Photidy", "Settings")
-        self.org_type.setCurrentText(str(settings.value("org_type", "Date First")))
+        settings = QSettings("Photidy", application="Settings")
+        self.org_type.setCurrentText(
+            str(object=settings.value("org_type", defaultValue="Date First"))
+        )
         self.date_precision.setCurrentText(
-            str(settings.value("date_precision", "Year/Month/Day"))
+            str(object=settings.value("date_precision", defaultValue="Year/Month/Day"))
         )
         self.location_precision.setCurrentText(
-            str(settings.value("location_precision", "City"))
+            str(object=settings.value("location_precision", defaultValue="City"))
         )
 
     def save_settings(self):
         """Save the current settings"""
-        settings = QSettings("Photidy", "Settings")
+        settings = QSettings("Photidy", application="Settings")
         settings.setValue("org_type", self.org_type.currentText())
         settings.setValue("date_precision", self.date_precision.currentText())
         settings.setValue("location_precision", self.location_precision.currentText())

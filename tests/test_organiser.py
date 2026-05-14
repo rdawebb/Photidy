@@ -26,51 +26,51 @@ class TestValidateDirectories:
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test validation with valid source and destination directories."""
-        _validate_directories(valid_source_dir, valid_dest_dir)
+        _validate_directories(source=valid_source_dir, dest=valid_dest_dir)
 
     @pytest.mark.parametrize(
-        "error_scenario",
-        ["nonexistent", "not_directory", "not_readable"],
+        argnames="error_scenario",
+        argvalues=["nonexistent", "not_directory", "not_readable"],
         ids=["missing", "is_file", "no_access"],
     )
     def test_source_validation_errors(self, temp_dir, suppress_logging, error_scenario):
         """Test various source directory validation errors."""
-        source = temp_dir / "source"
-        dest = temp_dir / "dest"
+        source: Path = temp_dir / "source"
+        dest: Path = temp_dir / "dest"
         dest.mkdir()
 
         if error_scenario == "nonexistent":
             # Source doesn't exist - don't create it
             pass
         elif error_scenario == "not_directory":
-            source.write_text("not a directory")
+            source.write_text(data="not a directory")
         elif error_scenario == "not_readable":
             source.mkdir()
-            with patch("os.access", return_value=False):
-                with pytest.raises(InvalidDirectoryError):
+            with patch(target="os.access", return_value=False):
+                with pytest.raises(expected_exception=InvalidDirectoryError):
                     _validate_directories(source, dest)
                 return
 
-        with pytest.raises(InvalidDirectoryError):
+        with pytest.raises(expected_exception=InvalidDirectoryError):
             _validate_directories(source, dest)
 
     def test_destination_directory_creation_failure(
         self, valid_source_dir, temp_dir, suppress_logging
     ):
         """Test that destination creation failure raises InvalidDirectoryError."""
-        source = valid_source_dir
-        dest = temp_dir / "dest"
+        source: Path = valid_source_dir
+        dest: Path = temp_dir / "dest"
 
         (temp_dir / "dest").write_text("this is a file, not a directory")
-        with pytest.raises(InvalidDirectoryError):
+        with pytest.raises(expected_exception=InvalidDirectoryError):
             _validate_directories(source, dest)
 
     def test_destination_directory_is_created_if_not_exists(
         self, valid_source_dir, temp_dir, suppress_logging
     ):
         """Test that destination directory is created if it doesn't exist."""
-        source = valid_source_dir
-        dest = temp_dir / "new_dest"
+        source: Path = valid_source_dir
+        dest: Path = temp_dir / "new_dest"
         assert not dest.exists()
         _validate_directories(source, dest)
         assert dest.exists()
@@ -80,8 +80,8 @@ class TestGetUniqueFilename:
     """Test _get_unique_filename function."""
 
     @pytest.mark.parametrize(
-        "existing_files,filename,expected",
-        [
+        argnames="existing_files,filename,expected",
+        argvalues=[
             ([], "photo.jpg", "photo.jpg"),
             (["photo.jpg"], "photo.jpg", "photo_1.jpg"),
             (
@@ -104,37 +104,37 @@ class TestGetUniqueFilename:
         self, temp_dir, suppress_logging, existing_files, filename, expected
     ):
         """Test unique filename generation with various conflict scenarios."""
-        directory = temp_dir / "dir"
+        directory: Path = temp_dir / "dir"
         directory.mkdir()
         for f in existing_files:
             (directory / f).write_text("test")
 
-        result = _get_unique_filename(directory, filename)
+        result: str = _get_unique_filename(directory, filename)
         assert result == expected
 
     def test_exception_during_filename_generation(self, temp_dir, suppress_logging):
         """Test that exception during filename generation raises PhotoOrganisationError."""
-        directory = temp_dir / "dir"
+        directory: Path = temp_dir / "dir"
         directory.mkdir()
 
-        with patch("pathlib.Path.exists", side_effect=Exception("Some error")):
-            with pytest.raises(PhotoOrganisationError):
-                _get_unique_filename(directory, "photo.jpg")
+        with patch(target="pathlib.Path.exists", side_effect=Exception("Some error")):
+            with pytest.raises(expected_exception=PhotoOrganisationError):
+                _get_unique_filename(directory, filename="photo.jpg")
 
 
 class TestOrganisePhotos:
     """Test organise_photos function."""
 
     @pytest.mark.parametrize(
-        "date_taken,location,expected_path",
-        [
+        argnames="date_taken,location,expected_path",
+        argvalues=[
             (
-                datetime(2024, 1, 15, 14, 30, 45),
+                datetime(year=2024, month=1, day=15, hour=14, minute=30, second=45),
                 "New York, New York, US",
                 Path("2024") / "01" / "15" / "New York, New York, US" / "photo.jpg",
             ),
             (
-                datetime(2024, 6, 20, 10, 15, 30),
+                datetime(year=2024, month=6, day=20, hour=10, minute=15, second=30),
                 "Unknown Location",
                 Path("2024") / "06" / "20" / "photo.jpg",
             ),
@@ -152,8 +152,8 @@ class TestOrganisePhotos:
         expected_path,
     ):
         """Test organising photos with various metadata combinations."""
-        image_file = valid_source_dir / "photo.jpg"
-        image_file.write_text("fake image")
+        image_file: Path = valid_source_dir / "photo.jpg"
+        image_file.write_text(data="fake image")
 
         mock_image_info = ImageInfo(
             path=image_file,
@@ -163,16 +163,18 @@ class TestOrganisePhotos:
             location=location,
         )
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info
+        ):
+            summary: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary["processed"] == 1
         assert summary["failed"] == []
         assert summary["total"] == 1
 
-        organised_path = valid_dest_dir / expected_path
+        organised_path: Path = valid_dest_dir / expected_path
         assert organised_path.exists()
 
     def test_mixed_valid_and_invalid_photos(
@@ -180,20 +182,18 @@ class TestOrganisePhotos:
     ):
         """Test processing mixture of valid and invalid photos."""
         # Create mock files
-        valid_file = valid_source_dir / "good_photo.jpg"
-        valid_file.write_text("fake image")
-        bad_file = valid_source_dir / "broken.jpg"
-        bad_file.write_text("fake image")
-
-        from pathlib import Path
+        valid_file: Path = valid_source_dir / "good_photo.jpg"
+        valid_file.write_text(data="fake image")
+        bad_file: Path = valid_source_dir / "broken.jpg"
+        bad_file.write_text(data="fake image")
 
         from src.core.image_info import ImageInfo
 
         def mock_get_image_info(path):
-            if "good" in str(path):
+            if "good" in str(object=path):
                 return ImageInfo(
                     path=Path(path),
-                    timestamp=datetime(2024, 1, 15),
+                    timestamp=datetime(year=2024, month=1, day=15),
                     lat=None,
                     lon=None,
                     location="New York, New York, US",
@@ -202,10 +202,10 @@ class TestOrganisePhotos:
                 raise PhotoMetadataError("Invalid metadata")
 
         with patch(
-            "src.core.organiser.get_image_info", side_effect=mock_get_image_info
+            target="src.core.organiser.get_image_info", side_effect=mock_get_image_info
         ):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+            summary: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary["processed"] == 1
@@ -213,8 +213,8 @@ class TestOrganisePhotos:
         assert summary["total"] == 2
 
     @pytest.mark.parametrize(
-        "error_type,error_message,expected_error_match",
-        [
+        argnames="error_type,error_message,expected_error_match",
+        argvalues=[
             ("missing_date", None, "Missing date metadata"),
             (
                 "metadata_error",
@@ -236,8 +236,8 @@ class TestOrganisePhotos:
         expected_error_match,
     ):
         """Test handling of various errors during photo processing."""
-        image_file = valid_source_dir / "photo.jpg"
-        image_file.write_text("fake image")
+        image_file: Path = valid_source_dir / "photo.jpg"
+        image_file.write_text(data="fake image")
 
         if error_type == "missing_date":
             from src.core.image_info import ImageInfo
@@ -250,26 +250,26 @@ class TestOrganisePhotos:
                 location="New York, New York, US",
             )
             with patch(
-                "src.core.organiser.get_image_info", return_value=mock_image_info
+                target="src.core.organiser.get_image_info", return_value=mock_image_info
             ):
-                summary = isolate_state["organise_photos"](
-                    str(valid_source_dir), str(valid_dest_dir)
+                summary: dict = isolate_state["organise_photos"](
+                    str(object=valid_source_dir), str(object=valid_dest_dir)
                 )
         elif error_type == "metadata_error":
             with patch(
-                "src.core.organiser.get_image_info",
+                target="src.core.organiser.get_image_info",
                 side_effect=error_message,
             ):
-                summary = isolate_state["organise_photos"](
-                    str(valid_source_dir), str(valid_dest_dir)
+                summary: dict = isolate_state["organise_photos"](
+                    str(object=valid_source_dir), str(object=valid_dest_dir)
                 )
         else:  # general_exception
             with patch(
-                "src.core.organiser.get_image_info",
+                target="src.core.organiser.get_image_info",
                 side_effect=error_message,
             ):
-                summary = isolate_state["organise_photos"](
-                    str(valid_source_dir), str(valid_dest_dir)
+                summary: dict = isolate_state["organise_photos"](
+                    str(object=valid_source_dir), str(object=valid_dest_dir)
                 )
 
         assert summary["processed"] == 0
@@ -277,8 +277,8 @@ class TestOrganisePhotos:
         assert expected_error_match in summary["failed"][0][1]
 
     @pytest.mark.parametrize(
-        "setup_type",
-        ["empty_directory", "non_image_files"],
+        argnames="setup_type",
+        argvalues=["empty_directory", "non_image_files"],
     )
     def test_empty_and_invalid_source_handling(
         self,
@@ -296,8 +296,8 @@ class TestOrganisePhotos:
             (valid_source_dir / "readme.md").write_text("markdown")
         # else: empty_directory - no setup needed
 
-        summary = isolate_state["organise_photos"](
-            str(valid_source_dir), str(valid_dest_dir)
+        summary: dict = isolate_state["organise_photos"](
+            str(object=valid_source_dir), str(object=valid_dest_dir)
         )
 
         assert summary["processed"] == 0
@@ -308,22 +308,24 @@ class TestOrganisePhotos:
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test that files in subdirectories are also processed recursively."""
-        subdir = valid_source_dir / "subdir"
+        subdir: Path = valid_source_dir / "subdir"
         subdir.mkdir(exist_ok=True)
-        image_file = subdir / "photo.jpg"
-        image_file.write_text("fake image")
+        image_file: Path = subdir / "photo.jpg"
+        image_file.write_text(data="fake image")
 
         mock_image_info = ImageInfo(
             path=image_file,
-            timestamp=datetime(2024, 1, 15),
+            timestamp=datetime(year=2024, month=1, day=15),
             lat=None,
             lon=None,
             location="Unknown Location",
         )
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info
+        ):
+            summary: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         # Files in subdirectories are also scanned and processed recursively
@@ -331,23 +333,23 @@ class TestOrganisePhotos:
         assert summary["failed"] == []
         assert summary["total"] == 1
 
-        organised_path = valid_dest_dir / "2024" / "01" / "15" / "photo.jpg"
+        organised_path: Path = valid_dest_dir / "2024" / "01" / "15" / "photo.jpg"
         assert organised_path.exists()
 
     @pytest.mark.parametrize(
-        "setup_photos,get_info_func,expected_checks",
-        [
+        argnames="setup_photos,get_info_func,expected_checks",
+        argvalues=[
             (
                 [("photo1.jpg", "fake image 1"), ("photo2.jpg", "fake image 2")],
                 lambda path: __import__(
-                    "src.core.image_info"
+                    name="src.core.image_info"
                 ).core.image_info.ImageInfo(
                     path=Path(path),
-                    timestamp=datetime(2024, 1, 15),
+                    timestamp=datetime(year=2024, month=1, day=15),
                     lat=None,
                     lon=None,
                     location="New York, New York, US"
-                    if "photo1" in str(path)
+                    if "photo1" in str(object=path)
                     else "Los Angeles, California, US",
                 ),
                 [
@@ -370,12 +372,12 @@ class TestOrganisePhotos:
             (
                 [("photo1.jpg", "fake image 1"), ("photo2.jpg", "fake image 2")],
                 lambda path: __import__(
-                    "src.core.image_info"
+                    name="src.core.image_info"
                 ).core.image_info.ImageInfo(
                     path=Path(path),
-                    timestamp=datetime(2024, 1, 15)
-                    if "photo1" in str(path)
-                    else datetime(2024, 12, 25),
+                    timestamp=datetime(year=2024, month=1, day=15)
+                    if "photo1" in str(object=path)
+                    else datetime(year=2024, month=12, day=25),
                     lat=None,
                     lon=None,
                     location="Unknown Location",
@@ -402,40 +404,44 @@ class TestOrganisePhotos:
         for filename, content in setup_photos:
             (valid_source_dir / filename).write_text(content)
 
-        with patch("src.core.organiser.get_image_info", side_effect=get_info_func):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+        with patch(
+            target="src.core.organiser.get_image_info", side_effect=get_info_func
+        ):
+            summary: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary["processed"] == 2
         assert summary["failed"] == []
 
         for expected_path_parts in expected_checks:
-            organised_path = valid_dest_dir / expected_path_parts[0]
+            organised_path: Path = valid_dest_dir / expected_path_parts[0]
             assert organised_path.exists()
 
     def test_file_conflict_handling_generates_unique_name(
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test that file conflicts are handled with unique naming."""
-        image_file = valid_source_dir / "photo.jpg"
-        image_file.write_text("fake image 1")
+        image_file: Path = valid_source_dir / "photo.jpg"
+        image_file.write_text(data="fake image 1")
 
-        target_dir = valid_dest_dir / "2024" / "01" / "15"
+        target_dir: Path = valid_dest_dir / "2024" / "01" / "15"
         target_dir.mkdir(parents=True)
-        (target_dir / "photo.jpg").write_text("existing file")
+        (target_dir / "photo.jpg").write_text(data="existing file")
 
         mock_image_info = ImageInfo(
             path=image_file,
-            timestamp=datetime(2024, 1, 15),
+            timestamp=datetime(year=2024, month=1, day=15),
             lat=None,
             lon=None,
             location="Unknown Location",
         )
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info
+        ):
+            summary: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary["processed"] == 1
@@ -446,22 +452,24 @@ class TestOrganisePhotos:
     ):
         """Test that file extensions are case-insensitive."""
         # Note: On case-insensitive filesystems (like macOS), this test may not behave as expected
-        file1 = valid_source_dir / "photo1.JPG"
-        file1.write_text("fake image")
-        file2 = valid_source_dir / "photo2.jpg"
-        file2.write_text("fake image")
+        file1: Path = valid_source_dir / "photo1.JPG"
+        file1.write_text(data="fake image")
+        file2: Path = valid_source_dir / "photo2.jpg"
+        file2.write_text(data="fake image")
 
         mock_image_info = ImageInfo(
             path=file1,
-            timestamp=datetime(2024, 1, 15),
+            timestamp=datetime(year=2024, month=1, day=15),
             lat=None,
             lon=None,
             location="Unknown Location",
         )
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info
+        ):
+            summary: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary["processed"] == 2
@@ -477,20 +485,22 @@ class TestOrganisePhotosDefaultPaths:
         """Test that organise_photos works with default state/undo paths."""
         from src.core.organiser import organise_photos
 
-        state_file = tmp_path / "organiser_state.json"
-        undo_log = tmp_path / "organiser_undo.log"
+        state_file: Path = tmp_path / "organiser_state.json"
+        undo_log: Path = tmp_path / "organiser_undo.log"
 
         with (
-            patch("src.core.organiser.state_file", state_file),
-            patch("src.core.organiser.undo_log", undo_log),
+            patch(target="src.core.organiser.state_file", new=state_file),
+            patch(target="src.core.organiser.undo_log", new=undo_log),
         ):
             # Create a test image
-            image_file = valid_source_dir / "photo.jpg"
-            image_file.write_text("fake image")
+            image_file: Path = valid_source_dir / "photo.jpg"
+            image_file.write_text(data="fake image")
 
             mock_image_info = ImageInfo(
                 path=image_file,
-                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                timestamp=datetime(
+                    year=2024, month=1, day=15, hour=14, minute=30, second=45
+                ),
                 lat=None,
                 lon=None,
                 location="New York, New York, US",
@@ -499,15 +509,17 @@ class TestOrganisePhotosDefaultPaths:
             # Change to temp directory so default paths write there
             import os
 
-            original_cwd = os.getcwd()
+            original_cwd: str = os.getcwd()
             try:
-                os.chdir(str(tmp_path))
+                os.chdir(path=str(object=tmp_path))
 
                 with patch(
-                    "src.core.organiser.get_image_info", return_value=mock_image_info
+                    target="src.core.organiser.get_image_info",
+                    return_value=mock_image_info,
                 ):
-                    summary = organise_photos(
-                        str(valid_source_dir), str(valid_dest_dir)
+                    summary: dict = organise_photos(
+                        source_dir=str(object=valid_source_dir),
+                        dest_dir=str(object=valid_dest_dir),
                     )
 
                 assert summary["processed"] == 1
@@ -517,7 +529,7 @@ class TestOrganisePhotosDefaultPaths:
                 assert state_file.exists()
                 assert undo_log.exists()
             finally:
-                os.chdir(original_cwd)
+                os.chdir(path=original_cwd)
 
     def test_undo_organisation_with_default_path(
         self, valid_source_dir, valid_dest_dir, suppress_logging, tmp_path
@@ -525,22 +537,22 @@ class TestOrganisePhotosDefaultPaths:
         """Test undo_organisation with default undo log path."""
         from src.core.organiser import organise_photos, undo_organisation
 
-        state_file = tmp_path / "organiser_state.json"
-        undo_log = tmp_path / "organiser_undo.log"
+        state_file: Path = tmp_path / "organiser_state.json"
+        undo_log: Path = tmp_path / "organiser_undo.log"
 
         with (
-            patch("src.core.organiser.state_file", state_file),
-            patch("src.core.organiser.undo_log", undo_log),
+            patch("src.core.organiser.state_file", new=state_file),
+            patch("src.core.organiser.undo_log", new=undo_log),
         ):
             # Create a test image
-            image_file = valid_source_dir / "photo.jpg"
-            image_file.write_text("fake image")
-
-            from pathlib import Path
+            image_file: Path = valid_source_dir / "photo.jpg"
+            image_file.write_text(data="fake image")
 
             mock_image_info = ImageInfo(
                 path=image_file,
-                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                timestamp=datetime(
+                    year=2024, month=1, day=15, hour=14, minute=30, second=45
+                ),
                 lat=None,
                 lon=None,
                 location="New York, New York, US",
@@ -548,22 +560,24 @@ class TestOrganisePhotosDefaultPaths:
 
             import os
 
-            original_cwd = os.getcwd()
+            original_cwd: str = os.getcwd()
             try:
-                os.chdir(str(tmp_path))
+                os.chdir(path=str(object=tmp_path))
 
                 # organise photos
                 with patch(
-                    "src.core.organiser.get_image_info", return_value=mock_image_info
+                    target="src.core.organiser.get_image_info",
+                    return_value=mock_image_info,
                 ):
-                    summary = organise_photos(
-                        str(valid_source_dir), str(valid_dest_dir)
+                    summary: dict = organise_photos(
+                        source_dir=str(object=valid_source_dir),
+                        dest_dir=str(object=valid_dest_dir),
                     )
 
                 assert summary["processed"] == 1
 
                 # Verify the file was moved
-                organised_path = (
+                organised_path: Path = (
                     Path(valid_dest_dir)
                     / "2024"
                     / "01"
@@ -581,11 +595,11 @@ class TestOrganisePhotosDefaultPaths:
                 assert image_file.exists()
                 assert not organised_path.exists()
             finally:
-                os.chdir(original_cwd)
+                os.chdir(path=original_cwd)
 
     @pytest.mark.parametrize(
-        "move_failure_type",
-        ["staging_move_fails", "final_move_fails"],
+        argnames="move_failure_type",
+        argvalues=["staging_move_fails", "final_move_fails"],
         ids=["staging_move_failure", "final_move_failure"],
     )
     def test_move_operation_failures(
@@ -597,12 +611,14 @@ class TestOrganisePhotosDefaultPaths:
         move_failure_type,
     ):
         """Test handling of file move failures during organisation."""
-        image_file = valid_source_dir / "photo.jpg"
-        image_file.write_text("fake image")
+        image_file: Path = valid_source_dir / "photo.jpg"
+        image_file.write_text(data="fake image")
 
         mock_image_info = ImageInfo(
             path=image_file,
-            timestamp=datetime(2024, 1, 15, 14, 30, 45),
+            timestamp=datetime(
+                year=2024, month=1, day=15, hour=14, minute=30, second=45
+            ),
             lat=None,
             lon=None,
             location="New York, New York, US",
@@ -611,13 +627,15 @@ class TestOrganisePhotosDefaultPaths:
         if move_failure_type == "staging_move_fails":
             # Mock shutil.move to fail on first call (staging)
             with patch(
-                "src.core.organiser.get_image_info", return_value=mock_image_info
+                target="src.core.organiser.get_image_info", return_value=mock_image_info
             ):
                 with patch(
-                    "src.core.organiser.shutil.move", side_effect=OSError("Move failed")
+                    target="src.core.organiser.shutil.move",
+                    side_effect=OSError("Move failed"),
                 ):
-                    summary = isolate_state["organise_photos"](
-                        str(valid_source_dir), str(valid_dest_dir)
+                    summary: dict = isolate_state["organise_photos"](
+                        source_dir=str(object=valid_source_dir),
+                        dest_dir=str(object=valid_dest_dir),
                     )
 
             assert summary["processed"] == 0
@@ -626,7 +644,7 @@ class TestOrganisePhotosDefaultPaths:
 
         else:  # final_move_fails
             # Mock shutil.move to succeed on first call, fail on second
-            call_count = [0]
+            call_count: list[int] = [0]
 
             def move_side_effect(src, dst):
                 call_count[0] += 1
@@ -636,16 +654,18 @@ class TestOrganisePhotosDefaultPaths:
                 from pathlib import Path as P
 
                 P(dst).parent.mkdir(parents=True, exist_ok=True)
-                P(src).rename(dst)
+                P(src).rename(target=dst)
 
             with patch(
-                "src.core.organiser.get_image_info", return_value=mock_image_info
+                target="src.core.organiser.get_image_info", return_value=mock_image_info
             ):
                 with patch(
-                    "src.core.organiser.shutil.move", side_effect=move_side_effect
+                    target="src.core.organiser.shutil.move",
+                    side_effect=move_side_effect,
                 ):
-                    summary = isolate_state["organise_photos"](
-                        str(valid_source_dir), str(valid_dest_dir)
+                    summary: dict = isolate_state["organise_photos"](
+                        source_dir=str(object=valid_source_dir),
+                        dest_dir=str(object=valid_dest_dir),
                     )
 
             assert summary["processed"] == 0
@@ -656,41 +676,45 @@ class TestOrganisePhotosDefaultPaths:
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test handling when staging directory creation fails."""
-        image_file = valid_source_dir / "photo.jpg"
-        image_file.write_text("fake image")
+        image_file: Path = valid_source_dir / "photo.jpg"
+        image_file.write_text(data="fake image")
 
         mock_image_info = ImageInfo(
             path=image_file,
-            timestamp=datetime(2024, 1, 15, 14, 30, 45),
+            timestamp=datetime(
+                year=2024, month=1, day=15, hour=14, minute=30, second=45
+            ),
             lat=None,
             lon=None,
             location="New York, New York, US",
         )
 
         # Mock Path.mkdir to raise Error when called
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info
+        ):
             with patch(
                 "pathlib.Path.mkdir", side_effect=PermissionError("No permission")
             ):
                 with pytest.raises(
-                    InvalidDirectoryError,
+                    expected_exception=InvalidDirectoryError,
                     match="Failed to create destination directory",
                 ):
                     isolate_state["organise_photos"](
-                        str(valid_source_dir), str(valid_dest_dir)
+                        str(object=valid_source_dir), str(object=valid_dest_dir)
                     )
 
     def test_undo_no_log_file(self, tmp_path, suppress_logging):
         """Test undo_organisation when no log file exists."""
         from src.core.organiser import undo_organisation
 
-        original_cwd = os.getcwd()
+        original_cwd: str = os.getcwd()
         try:
-            os.chdir(str(tmp_path))
+            os.chdir(path=str(object=tmp_path))
             # Should not raise, just log a warning
             undo_organisation()
         finally:
-            os.chdir(original_cwd)
+            os.chdir(path=str(object=original_cwd))
 
     def test_successful_undo_operation(
         self,
@@ -703,40 +727,43 @@ class TestOrganisePhotosDefaultPaths:
         """Test a complete successful undo operation."""
         from src.core.organiser import undo_organisation
 
-        state_file = tmp_path / "organiser_state.json"
-        undo_log = tmp_path / "organiser_undo.log"
+        state_file: Path = tmp_path / "organiser_state.json"
+        undo_log: Path = tmp_path / "organiser_undo.log"
 
         with (
-            patch("src.core.organiser.state_file", state_file),
-            patch("src.core.organiser.undo_log", undo_log),
+            patch(target="src.core.organiser.state_file", new=state_file),
+            patch(target="src.core.organiser.undo_log", new=undo_log),
         ):
-            image_file = valid_source_dir / "photo.jpg"
-            image_file.write_text("fake image")
+            image_file: Path = valid_source_dir / "photo.jpg"
+            image_file.write_text(data="fake image")
 
             mock_image_info = ImageInfo(
                 path=image_file,
-                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                timestamp=datetime(
+                    year=2024, month=1, day=15, hour=14, minute=30, second=45
+                ),
                 lat=None,
                 lon=None,
                 location="New York, New York, US",
             )
 
-            original_cwd = os.getcwd()
+            original_cwd: str = os.getcwd()
             try:
-                os.chdir(str(tmp_path))
+                os.chdir(path=str(object=tmp_path))
 
                 # organise the photo
                 with patch(
-                    "src.core.organiser.get_image_info", return_value=mock_image_info
+                    target="src.core.organiser.get_image_info",
+                    return_value=mock_image_info,
                 ):
-                    summary = isolate_state["organise_photos"](
-                        str(valid_source_dir), str(valid_dest_dir)
+                    summary: dict = isolate_state["organise_photos"](
+                        str(object=valid_source_dir), str(object=valid_dest_dir)
                     )
 
                 assert summary["processed"] == 1
 
                 # Verify file is in organised location
-                organised_path = (
+                organised_path: Path = (
                     Path(valid_dest_dir)
                     / "2024"
                     / "01"
@@ -748,17 +775,17 @@ class TestOrganisePhotosDefaultPaths:
                 assert not image_file.exists()
 
                 # Perform undo
-                undo_organisation(isolate_state["undo_log"])
+                undo_organisation(undo_log_path=isolate_state["undo_log"])
 
                 # Verify file is restored
                 assert image_file.exists()
                 assert not organised_path.exists()
             finally:
-                os.chdir(original_cwd)
+                os.chdir(path=original_cwd)
 
     @pytest.mark.parametrize(
-        "undo_scenario",
-        ["missing_destination", "missing_log", "log_parse_error"],
+        argnames="undo_scenario",
+        argvalues=["missing_destination", "missing_log", "log_parse_error"],
         ids=["missing_destination_file", "missing_log_file", "malformed_log_entry"],
     )
     def test_undo_error_scenarios(
@@ -773,31 +800,34 @@ class TestOrganisePhotosDefaultPaths:
         """Test undo_organisation with various error conditions."""
         from src.core.organiser import undo_organisation
 
-        original_cwd = os.getcwd()
+        original_cwd: str = os.getcwd()
         try:
-            os.chdir(str(tmp_path))
+            os.chdir(path=str(object=tmp_path))
 
             if undo_scenario == "missing_destination":
                 # organise a photo first
-                image_file = valid_source_dir / "photo.jpg"
-                image_file.write_text("fake image")
+                image_file: Path = valid_source_dir / "photo.jpg"
+                image_file.write_text(data="fake image")
                 mock_image_info = ImageInfo(
                     path=image_file,
-                    timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                    timestamp=datetime(
+                        year=2024, month=1, day=15, hour=14, minute=30, second=45
+                    ),
                     lat=None,
                     lon=None,
                     location="New York, New York, US",
                 )
                 with patch(
-                    "src.core.organiser.get_image_info", return_value=mock_image_info
+                    target="src.core.organiser.get_image_info",
+                    return_value=mock_image_info,
                 ):
-                    summary = isolate_state["organise_photos"](
-                        str(valid_source_dir), str(valid_dest_dir)
+                    summary: dict = isolate_state["organise_photos"](
+                        str(object=valid_source_dir), str(object=valid_dest_dir)
                     )
                 assert summary["processed"] == 1
 
                 # Delete the organised file
-                organised_path = (
+                organised_path: Path = (
                     Path(valid_dest_dir)
                     / "2024"
                     / "01"
@@ -816,14 +846,14 @@ class TestOrganisePhotosDefaultPaths:
 
             elif undo_scenario == "log_parse_error":
                 # Create a malformed log file
-                undo_log = tmp_path / "organiser_undo.log"
-                undo_log.write_text("not_a_valid_entry\n")
+                undo_log_path: Path = tmp_path / "organiser_undo.log"
+                undo_log_path.write_text(data="not_a_valid_entry\n")
 
                 # Should not raise, just skip invalid entries
                 undo_organisation()
 
         finally:
-            os.chdir(original_cwd)
+            os.chdir(path=original_cwd)
 
     def test_undo_move_restore_error(
         self,
@@ -836,47 +866,49 @@ class TestOrganisePhotosDefaultPaths:
         """Test undo when file restoration fails."""
         from src.core.organiser import undo_organisation
 
-        image_file = valid_source_dir / "photo.jpg"
-        image_file.write_text("fake image")
+        image_file: Path = valid_source_dir / "photo.jpg"
+        image_file.write_text(data="fake image")
 
         # mock_image_info1 and mock_image_info2 are not used in this test, remove them
 
-        original_cwd = os.getcwd()
+        original_cwd: str = os.getcwd()
         try:
-            os.chdir(str(tmp_path))
+            os.chdir(path=str(object=tmp_path))
 
             # organise the photo
 
             mock_image_info = ImageInfo(
                 path=image_file,
-                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                timestamp=datetime(
+                    year=2024, month=1, day=15, hour=14, minute=30, second=45
+                ),
                 lat=None,
                 lon=None,
                 location="New York, New York, US",
             )
             with patch(
-                "src.core.organiser.get_image_info", return_value=mock_image_info
+                target="src.core.organiser.get_image_info", return_value=mock_image_info
             ):
-                summary = isolate_state["organise_photos"](
-                    str(valid_source_dir), str(valid_dest_dir)
+                summary: dict = isolate_state["organise_photos"](
+                    str(object=valid_source_dir), str(object=valid_dest_dir)
                 )
 
             assert summary["processed"] == 1
 
             # Make source directory read-only to prevent restoration
-            os.chmod(str(valid_source_dir), 0o444)
+            os.chmod(path=str(object=valid_source_dir), mode=0o444)
 
             # Undo should handle move error gracefully
             try:
                 undo_organisation()
             finally:
-                os.chmod(str(valid_source_dir), 0o755)
+                os.chmod(path=str(object=valid_source_dir), mode=0o755)
         finally:
-            os.chdir(original_cwd)
+            os.chdir(path=original_cwd)
 
     @pytest.mark.parametrize(
-        "permission_error_type",
-        ["save_state", "log_move"],
+        argnames="permission_error_type",
+        argvalues=["save_state", "log_move"],
         ids=["save_state_permission", "log_move_permission"],
     )
     def test_permission_error_handling(
@@ -886,23 +918,29 @@ class TestOrganisePhotosDefaultPaths:
         from src.core.organiser import _log_move, _save_state
 
         if permission_error_type == "save_state":
-            state_file = tmp_path / "state.json"
+            state_file: Path = tmp_path / "state.json"
             # Mock open to raise PermissionError
-            with patch("builtins.open", side_effect=PermissionError("No permission")):
-                _save_state({"test": "data"}, state_file)
+            with patch(
+                target="builtins.open", side_effect=PermissionError("No permission")
+            ):
+                _save_state(state={"test": "data"}, state_file_path=state_file)
             # File should not exist
             assert not state_file.exists()
         else:
-            undo_log = tmp_path / "undo.log"
+            undo_log: Path = tmp_path / "undo.log"
             # Mock open to raise PermissionError
-            with patch("builtins.open", side_effect=PermissionError("No permission")):
-                _log_move(Path("src.txt"), Path("dst.txt"), undo_log)
+            with patch(
+                target="builtins.open", side_effect=PermissionError("No permission")
+            ):
+                _log_move(
+                    src=Path("src.txt"), dest=Path("dst.txt"), undo_log_path=undo_log
+                )
             # File should not exist
             assert not undo_log.exists()
 
     @pytest.mark.parametrize(
-        "error_type,mock_patch",
-        [
+        argnames="error_type,mock_patch",
+        argvalues=[
             (
                 "state_file_corruption",
                 lambda tmp_path: (
@@ -936,23 +974,25 @@ class TestOrganisePhotosDefaultPaths:
         patch_target, error = mock_patch(tmp_path)
 
         if error_type == "state_file_corruption":
-            state_file = tmp_path / "state.json"
-            state_file.write_text('{"key": "value"}')
-            with patch("builtins.open", side_effect=error):
-                result = _load_state(state_file)
+            state_file: Path = tmp_path / "state.json"
+            state_file.write_text(data='{"key": "value"}')
+            with patch(target="builtins.open", side_effect=error):
+                result: dict = _load_state(state_file_path=state_file)
                 assert result == {}
 
         elif error_type == "state_json_error":
-            state_file = tmp_path / "state.json"
-            with patch(patch_target, side_effect=error):
+            state_file: Path = tmp_path / "state.json"
+            with patch(target=patch_target, side_effect=error):
                 # _save_state should handle TypeError gracefully and not raise
-                _save_state({"test": "data"}, state_file)
+                _save_state(state={"test": "data"}, state_file_path=state_file)
 
         elif error_type == "log_write_error":
-            undo_log = tmp_path / "undo.log"
-            with patch(patch_target, side_effect=error):
+            undo_log: Path = tmp_path / "undo.log"
+            with patch(target=patch_target, side_effect=error):
                 # _log_move should handle TypeError gracefully
-                _log_move(Path("src.txt"), Path("dst.txt"), undo_log)
+                _log_move(
+                    src=Path("src.txt"), dest=Path("dst.txt"), undo_log_path=undo_log
+                )
 
     def test_multiple_undo_entries(
         self,
@@ -965,68 +1005,72 @@ class TestOrganisePhotosDefaultPaths:
         """Test undo with multiple entries in log."""
         from src.core.organiser import undo_organisation
 
-        state_file = tmp_path / "organiser_state.json"
-        undo_log = tmp_path / "organiser_undo.log"
+        state_file: Path = tmp_path / "organiser_state.json"
+        undo_log: Path = tmp_path / "organiser_undo.log"
 
         with (
-            patch("src.core.organiser.state_file", state_file),
-            patch("src.core.organiser.undo_log", undo_log),
+            patch(target="src.core.organiser.state_file", new=state_file),
+            patch(target="src.core.organiser.undo_log", new=undo_log),
         ):
             # Create multiple test images
 
-            image1 = valid_source_dir / "photo1.jpg"
-            image2 = valid_source_dir / "photo2.jpg"
-            image1.write_text("fake image 1")
-            image2.write_text("fake image 2")
+            image1: Path = valid_source_dir / "photo1.jpg"
+            image2: Path = valid_source_dir / "photo2.jpg"
+            image1.write_text(data="fake image 1")
+            image2.write_text(data="fake image 2")
 
             mock_image_info1 = ImageInfo(
                 path=image1,
-                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                timestamp=datetime(
+                    year=2024, month=1, day=15, hour=14, minute=30, second=45
+                ),
                 lat=None,
                 lon=None,
                 location="New York, New York, US",
             )
             mock_image_info2 = ImageInfo(
                 path=image2,
-                timestamp=datetime(2024, 1, 15, 14, 30, 45),
+                timestamp=datetime(
+                    year=2024, month=1, day=15, hour=14, minute=30, second=45
+                ),
                 lat=None,
                 lon=None,
                 location="New York, New York, US",
             )
 
-            original_cwd = os.getcwd()
+            original_cwd: str = os.getcwd()
             try:
-                os.chdir(str(tmp_path))
+                os.chdir(path=str(object=tmp_path))
 
                 # organise photos
 
                 with patch(
-                    "src.core.organiser.get_image_info",
+                    target="src.core.organiser.get_image_info",
                     side_effect=[mock_image_info1, mock_image_info2],
                 ):
-                    summary = isolate_state["organise_photos"](
-                        str(valid_source_dir), str(valid_dest_dir)
+                    summary: dict = isolate_state["organise_photos"](
+                        str(object=valid_source_dir), str(object=valid_dest_dir)
                     )
 
                 assert summary["processed"] == 2
 
                 # Verify files are moved
-                organised_dir = (
+                organised_dir: Path = (
                     Path(valid_dest_dir)
                     / "2024"
                     / "01"
                     / "15"
                     / "New York, New York, US"
                 )
-                assert len(list(organised_dir.glob("*.jpg"))) == 2
+                assert len(list(organised_dir.glob(pattern="*.jpg"))) == 2
 
                 # Undo the operation
-                undo_organisation(isolate_state["undo_log"])
+                undo_organisation(undo_log_path=isolate_state["undo_log"])
 
                 # Verify files are restored
                 assert image1.exists()
                 assert image2.exists()
                 # Verify files are no longer in organised location
-                assert len(list(organised_dir.glob("*.jpg"))) == 0
+                assert len(list(organised_dir.glob(pattern="*.jpg"))) == 0
             finally:
-                os.chdir(original_cwd)
+                os.chdir(path=original_cwd)

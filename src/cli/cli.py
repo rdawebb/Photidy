@@ -12,7 +12,7 @@ app = ExtendedTyper(help="Photidy CLI - Photo Organisation Made Easy")
 @app.command_with_aliases(aliases=["s", "sc"])
 def scan(
     directory: str = app.Argument(
-        ..., help="Directory to scan for photos", metavar="DIRECTORY"
+        default=..., help="Directory to scan for photos", metavar="DIRECTORY"
     ),
 ) -> None:
     """Scan a directory for photos and display the results"""
@@ -22,10 +22,10 @@ def scan(
 @app.command_with_aliases(aliases=["o", "org"])
 def organise(
     source: str = app.Argument(
-        None, help="Source directory containing photos", metavar="SOURCE"
+        default=None, help="Source directory containing photos", metavar="SOURCE"
     ),
     output: str = app.Argument(
-        None, help="Output directory for organised photos", metavar="DEST"
+        default=None, help="Output directory for organised photos", metavar="DEST"
     ),
 ) -> None:
     """Organise photos from the source directory to the output directory"""

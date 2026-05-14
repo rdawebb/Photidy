@@ -15,8 +15,8 @@ class TestCustomErrors:
     """Test custom exception behavior."""
 
     @pytest.mark.parametrize(
-        "error_class,message,parent_class",
-        [
+        argnames="error_class,message,parent_class",
+        argvalues=[
             (PhotidyError, "Test error message", Exception),
             (PhotoOrganisationError, "Organisation failed", PhotidyError),
             (PhotoMetadataError, "Metadata extraction failed", PhotidyError),
@@ -36,14 +36,14 @@ class TestCustomErrors:
     ):
         """Test error instantiation, message handling, and inheritance."""
         # Test instantiation
-        error = error_class(message)
-        assert str(error) == message
+        error: PhotidyError = error_class(message)
+        assert str(object=error) == message
 
         # Test inheritance
         assert issubclass(error_class, parent_class)
 
         # Test raising and catching
-        with pytest.raises(error_class):
+        with pytest.raises(expected_exception=error_class):
             raise error_class("Test")
 
         # Test catching as parent class (except for PhotidyError which has no parent with PhotidyError)

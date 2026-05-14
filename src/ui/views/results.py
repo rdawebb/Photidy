@@ -64,8 +64,8 @@ class ResultsView(QWidget):
         self.precision_combo.addItems(["Year/Month/Day", "Year/Month", "Year Only"])
         layout.addWidget(self.precision_combo)
 
-        # Output directory
-        output_label = QLabel("Output Directory:")
+        # Output location
+        output_label = QLabel("Output Location:")
         layout.addWidget(output_label)
         output_group = QGroupBox()
         output_layout = QVBoxLayout(output_group)
@@ -123,7 +123,7 @@ class ResultsView(QWidget):
 
     def on_organise_clicked(self):
         """Handle organise button click"""
-        options = {
+        options: dict[str, str] = {
             "type": "Date First"
             if self.date_first_radio.isChecked()
             else "Location First",

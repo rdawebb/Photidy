@@ -3,9 +3,12 @@
 import json
 import os
 import shutil
+from datetime import datetime
+from logging import Logger
 from pathlib import Path
 from typing import Optional
 
+from src.core.image_info import ImageInfo
 from src.utils.constants import SUPPORTED_FORMATS
 from src.utils.errors import (
     InvalidDirectoryError,
@@ -17,7 +20,7 @@ from src.utils.paths import state_file, undo_log
 
 from .metadata import get_image_info
 
-logger = get_logger(__name__)
+logger: Logger = get_logger(name=__name__)
 
 STAGING_DIR = ".staging"
 
@@ -32,14 +35,14 @@ def _load_state(state_file_path: Optional[Path] = None) -> dict:
         dict: The loaded state or empty dict if file doesn't exist or error occurs
     """
     if state_file_path is None:
-        state_file_path = state_file
+        state_file_path: Path = state_file
 
     if state_file_path.exists():
         try:
-            with open(state_file_path) as f:
-                return json.load(f)
+            with open(file=state_file_path) as f:
+                return json.load(fp=f)
         except (json.JSONDecodeError, OSError) as e:
-            logger.error(f"Failed to load state from {state_file_path}: {e}")
+            logger.error(msg=f"Failed to load state from {state_file_path}: {e}")
             return {}
     return {}
 
@@ -52,13 +55,13 @@ def _save_state(state: dict, state_file_path: Optional[Path] = None) -> None:
         state_file_path (Path | None): Path to state file. If None, uses default
     """
     if state_file_path is None:
-        state_file_path = state_file
+        state_file_path: Path = state_file
 
     try:
-        with open(state_file_path, "w") as f:
-            json.dump(state, f)
+        with open(file=state_file_path, mode="w") as f:
+            json.dump(obj=state, fp=f)
     except (OSError, TypeError) as e:
-        logger.error(f"Failed to save state to {state_file_path}: {e}")
+        logger.error(msg=f"Failed to save state to {state_file_path}: {e}")
 
 
 def _log_move(src: Path, dest: Path, undo_log_path: Optional[Path] = None) -> None:
@@ -70,13 +73,13 @@ def _log_move(src: Path, dest: Path, undo_log_path: Optional[Path] = None) -> No
         undo_log_path (Path | None): Path to undo log file. If None, uses default
     """
     if undo_log_path is None:
-        undo_log_path = undo_log
+        undo_log_path: Path = undo_log
 
     try:
-        with open(undo_log_path, "a") as f:
+        with open(file=undo_log_path, mode="a") as f:
             f.write(f"{src},{dest}\n")
     except (OSError, TypeError) as e:
-        logger.error(f"Failed to log move for {src} to {dest}: {e}")
+        logger.error(msg=f"Failed to log move for {src} to {dest}: {e}")
 
 
 def scan_directory(source_dir: str, progress_callback=None) -> dict:
@@ -95,17 +98,17 @@ def scan_directory(source_dir: str, progress_callback=None) -> dict:
 
     _validate_directories(source)
 
-    logger.debug(f"Scanning directory: {source}")
+    logger.debug(msg=f"Scanning directory: {source}")
 
-    image_files = []
-    other_count = 0
-    inaccessible_count = 0
-    count = 0  # For UI reporting
+    image_files: list[Path] = []
+    other_count: int = 0
+    inaccessible_count: int = 0
+    count: int = 0  # For UI reporting
 
     def _scan(dir: Path) -> None:
         nonlocal other_count, inaccessible_count, count
         try:
-            with os.scandir(dir) as entries:
+            with os.scandir(path=dir) as entries:
                 for entry in entries:
                     if entry.is_file():
                         try:
@@ -119,29 +122,31 @@ def scan_directory(source_dir: str, progress_callback=None) -> dict:
                             else:
                                 other_count += 1
                         except (OSError, PermissionError) as e:
-                            logger.warning(f"Error processing file {entry.path}: {e}")
+                            logger.warning(
+                                msg=f"Error processing file {entry.path}: {e}"
+                            )
                             inaccessible_count += 1
                     elif entry.is_dir():
-                        _scan(Path(entry.path))
+                        _scan(dir=Path(entry.path))
 
         except (OSError, PermissionError) as e:
-            logger.error(f"Error scanning directory {dir}: {e}")
+            logger.error(msg=f"Error scanning directory {dir}: {e}")
             inaccessible_count += 1
 
     try:
-        _scan(source)
+        _scan(dir=source)
 
     except Exception as e:
-        logger.error(f"Error scanning directory {source_dir}: {e}")
+        logger.error(msg=f"Error scanning directory {source_dir}: {e}")
         raise PhotoOrganisationError(
             f"Error scanning directory {source_dir}: {e}"
         ) from e
 
     logger.debug(
-        f"Found {len(image_files)} photos, {other_count} other files, and {inaccessible_count} inaccessible files."
+        msg=f"Found {len(image_files)} photos, {other_count} other files, and {inaccessible_count} inaccessible files."
     )
 
-    estimated_time = math.ceil(
+    estimated_time: int = math.ceil(
         len(image_files) * 0.005
     )  # seconds per image estimate (placeholder)
 
@@ -180,113 +185,117 @@ def organise_photos(
     _validate_directories(source, dest)
 
     if image_files is None:
-        files_to_process = scan_directory(source_dir)["image_files"]
+        files_to_process: list[Path] = scan_directory(source_dir)["image_files"]
     else:
-        files_to_process = image_files
+        files_to_process: list[Path] = image_files
 
-    staging_dir = dest / STAGING_DIR
+    staging_dir: Path = dest / STAGING_DIR
     try:
         staging_dir.mkdir(parents=True, exist_ok=True)
     except (OSError, PermissionError) as e:
-        logger.error(f"Failed to create staging directory: {staging_dir}: {e}")
+        logger.error(msg=f"Failed to create staging directory: {staging_dir}: {e}")
         raise PhotoOrganisationError(
             f"Failed to create staging directory: {staging_dir}"
         ) from e
 
-    logger.debug(f"Starting photo organisation from {source} to {dest}")
+    logger.debug(msg=f"Starting photo organisation from {source} to {dest}")
 
-    state = _load_state(state_file)
-    processed = 0
-    failed = []
+    state: dict[str, str] = _load_state(state_file_path=state_file)
+    processed: int = 0
+    failed: list[tuple[str, str]] = []
 
     for file_path in files_to_process:
         if not (file_path.is_file() and file_path.suffix.lower() in SUPPORTED_FORMATS):
             continue
 
         if file_path.name in state and state[file_path.name] == "processed":
-            logger.debug(f"Skipping already processed file: {file_path.name}")
+            logger.debug(msg=f"Skipping already processed file: {file_path.name}")
             continue
 
         try:
-            logger.debug(f"Processing file: {file_path.name}")
-            image_info = get_image_info(file_path)
-            date = image_info.timestamp
-            location = image_info.location
+            logger.debug(msg=f"Processing file: {file_path.name}")
+            image_info: ImageInfo = get_image_info(file_path)
+            date: datetime | None = image_info.timestamp
+            location: str | None = image_info.location
 
             if not date:
-                logger.warning(f"Missing date for {file_path.name}, skipping.")
+                logger.warning(msg=f"Missing date for {file_path.name}, skipping.")
                 failed.append((file_path.name, "Missing date metadata"))
                 state[file_path.name] = "failed"
-                _save_state(state, state_file)
+                _save_state(state, state_file_path=state_file)
                 continue
 
-            year = date.strftime("%Y")
-            month = date.strftime("%m")
-            day = date.strftime("%d")
+            year: str = date.strftime("%Y")
+            month: str = date.strftime("%m")
+            day: str = date.strftime("%d")
 
             if location and location != "Unknown Location":
-                target_dir = dest / year / month / day / location
+                target_dir: Path = dest / year / month / day / location
             elif not location or location == "Unknown Location":
-                target_dir = dest / year / month / day
+                target_dir: Path = dest / year / month / day
 
             target_dir.mkdir(parents=True, exist_ok=True)
-            unique_filename = _get_unique_filename(target_dir, file_path.name)
+            unique_filename: str = _get_unique_filename(
+                directory=target_dir, filename=file_path.name
+            )
 
-            staged_path = staging_dir / unique_filename
+            staged_path: Path = staging_dir / unique_filename
             try:
-                shutil.move(str(file_path), staged_path)
+                shutil.move(src=str(object=file_path), dst=staged_path)
             except Exception as e:
-                logger.error(f"Failed to move {file_path.name} to {staged_path}: {e}")
+                logger.error(
+                    msg=f"Failed to move {file_path.name} to {staged_path}: {e}"
+                )
                 failed.append((file_path.name, f"Staging move failed: {e}"))
                 state[file_path.name] = "failed"
-                _save_state(state, state_file)
+                _save_state(state, state_file_path=state_file)
                 continue
 
-            final_path = target_dir / unique_filename
+            final_path: Path = target_dir / unique_filename
             try:
-                shutil.move(str(staged_path), final_path)
-                logger.debug(f"Moved {file_path.name} to {final_path}")
-                _log_move(file_path, final_path, undo_log)
+                shutil.move(src=str(object=staged_path), dst=final_path)
+                logger.debug(msg=f"Moved {file_path.name} to {final_path}")
+                _log_move(src=file_path, dest=final_path, undo_log_path=undo_log)
                 state[file_path.name] = "processed"
-                _save_state(state, state_file)
+                _save_state(state, state_file_path=state_file)
                 processed += 1
             except Exception as e:
                 logger.error(
-                    f"Failed to move {file_path.name} from staging to final: {e}"
+                    msg=f"Failed to move {file_path.name} from staging to final: {e}"
                 )
                 failed.append((file_path.name, f"Final move failed: {e}"))
                 state[file_path.name] = "failed"
-                _save_state(state, state_file)
+                _save_state(state, state_file_path=state_file)
                 try:
-                    shutil.move(str(staged_path), file_path)
+                    shutil.move(src=str(object=staged_path), dst=file_path)
                 except Exception as e2:
                     logger.error(
-                        f"Failed to restore {file_path.name} from staging: {e2}"
+                        msg=f"Failed to restore {file_path.name} from staging: {e2}"
                     )
 
         except PhotoMetadataError as e:
-            logger.error(f"Metadata error for {file_path.name}: {e}")
-            failed.append((file_path.name, str(e)))
+            logger.error(msg=f"Metadata error for {file_path.name}: {e}")
+            failed.append((file_path.name, str(object=e)))
             state[file_path.name] = "failed"
-            _save_state(state, state_file)
+            _save_state(state, state_file_path=state_file)
         except Exception as e:
-            logger.error(f"Failed to process {file_path.name}: {e}")
-            failed.append((file_path.name, str(e)))
+            logger.error(msg=f"Failed to process {file_path.name}: {e}")
+            failed.append((file_path.name, str(object=e)))
             state[file_path.name] = "failed"
-            _save_state(state, state_file)
+            _save_state(state, state_file_path=state_file)
 
-    summary = {
+    summary: dict[str, int | list[tuple[str, str]]] = {
         "processed": processed,
         "failed": failed,
         "total": processed + len(failed),
     }
 
     logger.info(
-        f"Photo organisation completed: {processed} processed, {len(failed)} failed."
+        msg=f"Photo organisation completed: {processed} processed, {len(failed)} failed."
     )
     if failed:
         for fname, reason in failed:
-            logger.warning(f"Failed: {fname} - Reason: {reason}")
+            logger.warning(msg=f"Failed: {fname} - Reason: {reason}")
 
     return summary
 
@@ -297,22 +306,22 @@ def _remove_empty_dirs(root: Path) -> None:
     Args:
         path (Path): The directory path to clean
     """
-    for dirpath, _, _ in os.walk(root, topdown=False):
+    for dirpath, _, _ in os.walk(top=root, topdown=False):
         path = Path(dirpath)
         for file in path.iterdir():
             if file.is_file() and file.name.startswith("."):
                 try:
                     file.unlink()
-                    logger.debug(f"Removed hidden file: {file}")
+                    logger.debug(msg=f"Removed hidden file: {file}")
                 except Exception as e:
-                    logger.debug(f"Could not remove hidden file {file}: {e}")
+                    logger.debug(msg=f"Could not remove hidden file {file}: {e}")
 
         try:
             if not any(path.iterdir()):
                 path.rmdir()
-                logger.debug(f"Removed empty directory: {path}")
+                logger.debug(msg=f"Removed empty directory: {path}")
         except OSError as e:
-            logger.debug(f"Could not remove directory {path}: {e}")
+            logger.debug(msg=f"Could not remove directory {path}: {e}")
 
 
 def undo_organisation(undo_log_path: Optional[Path] = None) -> bool:
@@ -322,68 +331,72 @@ def undo_organisation(undo_log_path: Optional[Path] = None) -> bool:
         undo_log_path (Path | None): Path to undo log file - if None, uses default
     """
     if undo_log_path is None:
-        undo_log_path = undo_log
+        undo_log_path: Path = undo_log
 
     if not undo_log_path.exists():
-        logger.warning("No undo log found. Nothing to undo.")
+        logger.warning(msg="No undo log found. Nothing to undo.")
         return False
 
     try:
-        with open(undo_log) as f:
-            moves = [line.strip().split(",", 1) for line in f if "," in line]
+        with open(file=undo_log) as f:
+            moves: list[list[str]] = [
+                line.strip().split(sep=",", maxsplit=1) for line in f if "," in line
+            ]
 
-        dest_paths = [Path(dest) for _, dest in moves]
+        dest_paths: list[Path] = [Path(dest) for _, dest in moves]
         if not dest_paths:
-            logger.warning("No valid destination paths found for undo.")
+            logger.warning(msg="No valid destination paths found for undo.")
             return False
 
-        main_dest_root = os.path.commonpath([p.parent for p in dest_paths])
+        main_dest_root: str = os.path.commonpath(paths=[p.parent for p in dest_paths])
 
         for src, dest in reversed(moves):
             try:
                 if Path(dest).exists():
                     Path(src).parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(dest, src)
-                    logger.debug(f"Restored {dest} to {src}")
+                    shutil.move(src=dest, dst=src)
+                    logger.debug(msg=f"Restored {dest} to {src}")
                 else:
-                    logger.warning(f"Destination file {dest} does not exist for undo")
+                    logger.warning(
+                        msg=f"Destination file {dest} does not exist for undo"
+                    )
 
             except Exception as e:
-                logger.error(f"Failed to restore {dest} to {src}: {e}")
+                logger.error(msg=f"Failed to restore {dest} to {src}: {e}")
                 raise PhotoOrganisationError(f"Failed to restore {dest} to {src}: {e}")
 
         # Cleanup created directories & staging area
-        staging_dir = Path(main_dest_root) / STAGING_DIR
+        staging_dir: Path = Path(main_dest_root) / STAGING_DIR
         try:
             staging_dir.rmdir()
-            logger.debug(f"Removed empty directory: {staging_dir}")
+            logger.debug(msg=f"Removed empty directory: {staging_dir}")
         except OSError:
-            logger.debug(f"Directory not empty or missing: {staging_dir}")
+            logger.debug(msg=f"Directory not empty or missing: {staging_dir}")
 
-        _remove_empty_dirs(Path(main_dest_root))
+        _remove_empty_dirs(root=Path(main_dest_root))
 
         # Clear the state file
-        state_file_path = state_file
+        state_file_path: Path = state_file
         try:
-            with open(state_file_path, "w") as f:
-                json.dump({}, f)
-            logger.debug("Cleared state file after undo operation")
+            with open(file=state_file_path, mode="w") as f:
+                json.dump(obj={}, fp=f)
+            logger.debug(msg="Cleared state file after undo operation")
         except Exception as e:
-            logger.warning(f"Failed to clear state file after undo: {e}")
+            logger.warning(msg=f"Failed to clear state file after undo: {e}")
 
         # Clear the undo log
         try:
-            with open(undo_log_path, "w") as f:
+            with open(file=undo_log_path, mode="w") as f:
                 f.write("")
-            logger.debug("Cleared undo log after undo operation")
+            logger.debug(msg="Cleared undo log after undo operation")
         except Exception as e:
-            logger.warning(f"Failed to clear undo log after undo: {e}")
+            logger.warning(msg=f"Failed to clear undo log after undo: {e}")
 
-        logger.info("Undo operation completed.")
+        logger.info(msg="Undo operation completed.")
         return True
 
     except Exception as e:
-        logger.error(f"Error during undo operation: {e}")
+        logger.error(msg=f"Error during undo operation: {e}")
         raise PhotoOrganisationError(f"Error during undo operation: {e}")
 
 
@@ -401,7 +414,7 @@ def _validate_directories(source: Path, dest: Optional[Path] = None) -> None:
         raise InvalidDirectoryError(f"Source directory does not exist: {source}")
     if not source.is_dir():
         raise InvalidDirectoryError(f"Source path is not a directory: {source}")
-    if not os.access(source, os.R_OK):
+    if not os.access(path=source, mode=os.R_OK):
         raise InvalidDirectoryError(f"Source directory is not readable: {source}")
 
     if dest is not None:
@@ -412,9 +425,11 @@ def _validate_directories(source: Path, dest: Optional[Path] = None) -> None:
                 f"Failed to create destination directory: {dest}"
             ) from e
 
-        logger.debug(f"Validated directories - source: {source}, destination: {dest}")
+        logger.debug(
+            msg=f"Validated directories - source: {source}, destination: {dest}"
+        )
     else:
-        logger.debug(f"Validated source directory: {source}")
+        logger.debug(msg=f"Validated source directory: {source}")
 
 
 def _get_unique_filename(directory, filename) -> str:
@@ -428,24 +443,24 @@ def _get_unique_filename(directory, filename) -> str:
         str: A unique filename
     """
     try:
-        path = Path(directory) / filename
+        path: Path = Path(directory) / filename
         if not path.exists():
             return filename
 
-        stem = Path(filename).stem
-        suffix = Path(filename).suffix
-        counter = 1
+        stem: str = Path(filename).stem
+        suffix: str = Path(filename).suffix
+        counter: int = 1
 
         while (Path(directory) / f"{stem}_{counter}{suffix}").exists():
             counter += 1
 
-        unique_name = f"{stem}_{counter}{suffix}"
-        logger.debug(f"Generated unique filename: {unique_name} in {directory}")
+        unique_name: str = f"{stem}_{counter}{suffix}"
+        logger.debug(msg=f"Generated unique filename: {unique_name} in {directory}")
 
         return unique_name
     except Exception as e:
         logger.error(
-            f"Error generating unique filename for {filename} in {directory}: {e}"
+            msg=f"Error generating unique filename for {filename} in {directory}: {e}"
         )
         raise PhotoOrganisationError(
             f"Error generating unique filename for {filename} in {directory}"

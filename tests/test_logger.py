@@ -13,18 +13,18 @@ class TestGetLogger:
 
     def test_returns_logger_with_correct_name(self):
         """Test that get_logger returns a logger with the correct name."""
-        logger = get_logger("test_module")
+        logger: logging.Logger = get_logger(name="test_module")
         assert logger.name == "test_module"
         assert isinstance(logger, logging.Logger)
 
     def test_logger_has_handlers(self):
         """Test that returned logger has handlers configured."""
-        logger = get_logger("test_module_handlers")
+        logger: logging.Logger = get_logger(name="test_module_handlers")
         assert len(logger.handlers) > 0
 
     @pytest.mark.parametrize(
-        "handler_type,expected_level",
-        [
+        argnames="handler_type,expected_level",
+        argvalues=[
             ("console", logging.ERROR),
             ("file", logging.DEBUG),
         ],
@@ -33,11 +33,11 @@ class TestGetLogger:
     def test_logger_handler_configuration(self, handler_type, expected_level):
         """Test that logger has both console and file handlers with correct levels."""
         logger_name = f"test_{handler_type}_config"
-        logger = get_logger(logger_name)
+        logger: logging.Logger = get_logger(name=logger_name)
 
         if handler_type == "console":
             # Test console handler exists
-            console_handlers = [
+            console_handlers: list[logging.StreamHandler] = [
                 h
                 for h in logger.handlers
                 if isinstance(h, logging.StreamHandler)
@@ -49,7 +49,7 @@ class TestGetLogger:
 
         elif handler_type == "file":
             # Test file handler exists
-            file_handlers = [
+            file_handlers: list[logging.FileHandler] = [
                 h for h in logger.handlers if isinstance(h, logging.FileHandler)
             ]
             assert len(file_handlers) > 0, "Missing file handler"
@@ -62,7 +62,7 @@ class TestGetLogger:
 
     def test_logger_level_is_debug(self):
         """Test that logger itself is set to DEBUG level."""
-        logger = get_logger("test_logger_level")
+        logger: logging.Logger = get_logger(name="test_logger_level")
         assert logger.level == logging.DEBUG
 
     def test_idempotency_handlers_not_duplicated(self):
@@ -72,21 +72,21 @@ class TestGetLogger:
         if logger_name in logging.Logger.manager.loggerDict:
             del logging.Logger.manager.loggerDict[logger_name]
 
-        logger1 = get_logger(logger_name)
-        handler_count_first = len(logger1.handlers)
+        logger1: logging.Logger = get_logger(name=logger_name)
+        handler_count_first: int = len(logger1.handlers)
 
-        logger2 = get_logger(logger_name)
-        handler_count_second = len(logger2.handlers)
+        logger2: logging.Logger = get_logger(name=logger_name)
+        handler_count_second: int = len(logger2.handlers)
 
         assert handler_count_first == handler_count_second
         assert logger1 is logger2
 
     def test_formatter_is_applied(self):
         """Test that formatters are applied to handlers."""
-        logger = get_logger("test_formatter")
+        logger: logging.Logger = get_logger(name="test_formatter")
         for handler in logger.handlers:
             assert handler.formatter is not None
-            fmt = getattr(handler.formatter, "_fmt", None)
+            fmt: str | None = getattr(handler.formatter, "_fmt", None)
             assert isinstance(fmt, str)
             assert "%(asctime)s" in fmt
             assert "%(name)s" in fmt
@@ -95,8 +95,8 @@ class TestGetLogger:
 
     def test_same_logger_instance_returned(self):
         """Test that multiple calls return the same logger instance."""
-        logger1 = get_logger("test_same_instance")
-        logger2 = get_logger("test_same_instance")
+        logger1: logging.Logger = get_logger(name="test_same_instance")
+        logger2: logging.Logger = get_logger(name="test_same_instance")
         assert logger1 is logger2
 
 
@@ -106,23 +106,29 @@ class TestConfigureLogging:
     def test_configure_logging_with_default_level(self):
         """Test configure_logging sets correct default level."""
         configure_logging()
-        root_logger = logging.getLogger("photidy")
+        root_logger: logging.Logger = logging.getLogger(name="photidy")
         # Should be at least INFO level
         assert root_logger.level >= logging.INFO
 
     @pytest.mark.parametrize(
-        "level",
-        [logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL],
+        argnames="level",
+        argvalues=[
+            logging.DEBUG,
+            logging.INFO,
+            logging.WARNING,
+            logging.ERROR,
+            logging.CRITICAL,
+        ],
         ids=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     )
     def test_configure_logging_levels(self, level):
         """Test configure_logging with various logging levels."""
         configure_logging(level=level)
-        photidy_logger = logging.getLogger("photidy")
+        photidy_logger: logging.Logger = logging.getLogger(name="photidy")
         assert photidy_logger.level == level
 
     def test_configure_logging_affects_photidy_logger(self):
         """Test that configure_logging affects the 'photidy' logger."""
         configure_logging(level=logging.CRITICAL)
-        logger = logging.getLogger("photidy")
+        logger: logging.Logger = logging.getLogger(name="photidy")
         assert logger.level == logging.CRITICAL

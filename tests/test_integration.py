@@ -18,11 +18,23 @@ class TestPhotidyIntegration:
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test complete workflow from source to organised destination."""
-        photos = [
-            ("photo1.jpg", datetime(2024, 1, 15), "New York, New York, US"),
-            ("photo2.jpg", datetime(2024, 1, 15), "New York, New York, US"),
-            ("photo3.jpg", datetime(2024, 6, 20), "Los Angeles, California, US"),
-            ("photo4.jpg", datetime(2024, 12, 25), "Unknown Location"),
+        photos: list[tuple[str, datetime, str]] = [
+            (
+                "photo1.jpg",
+                datetime(year=2024, month=1, day=15),
+                "New York, New York, US",
+            ),
+            (
+                "photo2.jpg",
+                datetime(year=2024, month=1, day=15),
+                "New York, New York, US",
+            ),
+            (
+                "photo3.jpg",
+                datetime(year=2024, month=6, day=20),
+                "Los Angeles, California, US",
+            ),
+            ("photo4.jpg", datetime(year=2024, month=12, day=25), "Unknown Location"),
         ]
 
         for photo_name, _, _ in photos:
@@ -30,7 +42,7 @@ class TestPhotidyIntegration:
 
         def mock_get_image_info(path):
             for photo_name, date_taken, location in photos:
-                if photo_name in str(path):
+                if photo_name in str(object=path):
                     return ImageInfo(
                         path=Path(path),
                         timestamp=date_taken,
@@ -47,10 +59,10 @@ class TestPhotidyIntegration:
             )
 
         with patch(
-            "src.core.organiser.get_image_info", side_effect=mock_get_image_info
+            target="src.core.organiser.get_image_info", side_effect=mock_get_image_info
         ):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+            summary: dict[str, int] = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         # Verify summary
@@ -89,22 +101,28 @@ class TestPhotidyIntegration:
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test that directory structure follows expected pattern: YYYY/MM/DD/Location."""
-        image_file = valid_source_dir / "photo.jpg"
-        image_file.write_text("fake image")
+        image_file: Path = valid_source_dir / "photo.jpg"
+        image_file.write_text(data="fake image")
 
         mock_image_info = ImageInfo(
             path=image_file,
-            timestamp=datetime(2024, 3, 7, 15, 45, 30),
+            timestamp=datetime(
+                year=2024, month=3, day=7, hour=15, minute=45, second=30
+            ),
             lat=None,
             lon=None,
             location="Paris, Île-de-France, FR",
         )
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            isolate_state["organise_photos"](str(valid_source_dir), str(valid_dest_dir))
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info
+        ):
+            isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
+            )
 
         # Verify exact directory structure
-        expected_path = (
+        expected_path: Path = (
             valid_dest_dir
             / "2024"
             / "03"
@@ -118,53 +136,57 @@ class TestPhotidyIntegration:
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test that files are moved (not copied) and renamed correctly."""
-        image_file = valid_source_dir / "test_photo.jpg"
-        image_file.write_text("fake image")
+        image_file: Path = valid_source_dir / "test_photo.jpg"
+        image_file.write_text(data="fake image")
 
         assert image_file.exists()
 
         mock_image_info = ImageInfo(
             path=image_file,
-            timestamp=datetime(2024, 5, 12),
+            timestamp=datetime(year=2024, month=5, day=12),
             lat=None,
             lon=None,
             location="Unknown Location",
         )
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            isolate_state["organise_photos"](str(valid_source_dir), str(valid_dest_dir))
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info
+        ):
+            isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
+            )
 
         assert not image_file.exists()
 
-        organised_path = valid_dest_dir / "2024" / "05" / "12" / "test_photo.jpg"
+        organised_path: Path = valid_dest_dir / "2024" / "05" / "12" / "test_photo.jpg"
         assert organised_path.exists()
 
     def test_summary_accuracy_with_various_photo_sets(
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test summary accuracy with mixed scenarios."""
-        valid_file = valid_source_dir / "valid.jpg"
-        valid_file.write_text("fake image")
+        valid_file: Path = valid_source_dir / "valid.jpg"
+        valid_file.write_text(data="fake image")
 
-        no_metadata_file = valid_source_dir / "no_metadata.jpg"
-        no_metadata_file.write_text("fake image")
+        no_metadata_file: Path = valid_source_dir / "no_metadata.jpg"
+        no_metadata_file.write_text(data="fake image")
 
-        error_file = valid_source_dir / "error.jpg"
-        error_file.write_text("fake image")
+        error_file: Path = valid_source_dir / "error.jpg"
+        error_file.write_text(data="fake image")
 
-        txt_file = valid_source_dir / "document.txt"
-        txt_file.write_text("not an image")
+        txt_file: Path = valid_source_dir / "document.txt"
+        txt_file.write_text(data="not an image")
 
         def mock_get_image_info(path):
-            if "valid" in str(path):
+            if "valid" in str(object=path):
                 return ImageInfo(
                     path=Path(path),
-                    timestamp=datetime(2024, 1, 1),
+                    timestamp=datetime(year=2024, month=1, day=1),
                     lat=None,
                     lon=None,
                     location="Unknown Location",
                 )
-            elif "no_metadata" in str(path):
+            elif "no_metadata" in str(object=path):
                 return ImageInfo(
                     path=Path(path),
                     timestamp=None,
@@ -176,10 +198,10 @@ class TestPhotidyIntegration:
                 raise Exception("Processing error")
 
         with patch(
-            "src.core.organiser.get_image_info", side_effect=mock_get_image_info
+            target="src.core.organiser.get_image_info", side_effect=mock_get_image_info
         ):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+            summary: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary["processed"] == 1
@@ -188,22 +210,26 @@ class TestPhotidyIntegration:
 
     def test_invalid_source_directory_raises_error(self, temp_dir, suppress_logging):
         """Test that invalid source directory raises appropriate error."""
-        nonexistent_source = temp_dir / "nonexistent"
-        dest = temp_dir / "dest"
+        nonexistent_source: Path = temp_dir / "nonexistent"
+        dest: Path = temp_dir / "dest"
         dest.mkdir()
 
-        with pytest.raises(InvalidDirectoryError):
-            organise_photos(str(nonexistent_source), str(dest))
+        with pytest.raises(expected_exception=InvalidDirectoryError):
+            organise_photos(
+                source_dir=str(object=nonexistent_source), dest_dir=str(object=dest)
+            )
 
     def test_invalid_destination_directory_raises_error(
         self, valid_source_dir, temp_dir, suppress_logging
     ):
         """Test that invalid destination directory raises appropriate error."""
-        bad_dest = temp_dir / "bad_dest"
-        bad_dest.write_text("this is a file")
+        bad_dest: Path = temp_dir / "bad_dest"
+        bad_dest.write_text(data="this is a file")
 
-        with pytest.raises(InvalidDirectoryError):
-            organise_photos(str(valid_source_dir), str(bad_dest))
+        with pytest.raises(expected_exception=InvalidDirectoryError):
+            organise_photos(
+                source_dir=str(object=valid_source_dir), dest_dir=str(object=bad_dest)
+            )
 
     def test_large_batch_photo_organisation(
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
@@ -213,14 +239,14 @@ class TestPhotidyIntegration:
             (valid_source_dir / f"photo_{i}.jpg").write_text("fake image")
 
         def mock_get_image_info(path):
-            filename = Path(path).name  # Get just the filename
-            photo_num = int(filename.split("_")[1].split(".")[0])
-            dates = [
-                datetime(2024, 1, 15),
-                datetime(2024, 6, 20),
-                datetime(2024, 12, 25),
+            filename: str = Path(path).name  # Get just the filename
+            photo_num: int = int(filename.split(sep="_")[1].split(sep=".")[0])
+            dates: list[datetime] = [
+                datetime(year=2024, month=1, day=15),
+                datetime(year=2024, month=6, day=20),
+                datetime(year=2024, month=12, day=25),
             ]
-            locations = [
+            locations: list[str] = [
                 "New York, New York, US",
                 "Los Angeles, California, US",
                 "Unknown",
@@ -234,10 +260,10 @@ class TestPhotidyIntegration:
             )
 
         with patch(
-            "src.core.organiser.get_image_info", side_effect=mock_get_image_info
+            target="src.core.organiser.get_image_info", side_effect=mock_get_image_info
         ):
-            summary = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+            summary: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary["processed"] == 20
@@ -251,20 +277,22 @@ class TestPhotidyIntegration:
         self, valid_source_dir, valid_dest_dir, suppress_logging, isolate_state
     ):
         """Test organising photos with duplicate filenames but different content."""
-        file1 = valid_source_dir / "vacation.jpg"
-        file1.write_text("fake image 1")
+        file1: Path = valid_source_dir / "vacation.jpg"
+        file1.write_text(data="fake image 1")
 
         mock_image_info = ImageInfo(
             path=file1,
-            timestamp=datetime(2024, 7, 10),
+            timestamp=datetime(year=2024, month=7, day=10),
             lat=None,
             lon=None,
             location="Unknown Location",
         )
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info):
-            summary1 = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info
+        ):
+            summary1: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary1["processed"] == 1
@@ -273,25 +301,27 @@ class TestPhotidyIntegration:
         isolate_state["clear_state"]()
 
         # Create another file with same name
-        file2 = valid_source_dir / "vacation.jpg"
-        file2.write_text("fake image 2")
+        file2: Path = valid_source_dir / "vacation.jpg"
+        file2.write_text(data="fake image 2")
 
         mock_image_info2 = ImageInfo(
             path=file2,
-            timestamp=datetime(2024, 7, 10),
+            timestamp=datetime(year=2024, month=7, day=10),
             lat=None,
             lon=None,
             location="Unknown Location",
         )
 
-        with patch("src.core.organiser.get_image_info", return_value=mock_image_info2):
-            summary2 = isolate_state["organise_photos"](
-                str(valid_source_dir), str(valid_dest_dir)
+        with patch(
+            target="src.core.organiser.get_image_info", return_value=mock_image_info2
+        ):
+            summary2: dict = isolate_state["organise_photos"](
+                str(object=valid_source_dir), str(object=valid_dest_dir)
             )
 
         assert summary2["processed"] == 1
 
         # Check that both files exist with unique names
-        target_dir = valid_dest_dir / "2024" / "07" / "10"
+        target_dir: Path = valid_dest_dir / "2024" / "07" / "10"
         assert (target_dir / "vacation.jpg").exists()
         assert (target_dir / "vacation_1.jpg").exists()

@@ -1,5 +1,6 @@
 """Organisation progress view for the application GUI"""
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
 
 
@@ -14,11 +15,14 @@ class ProgressView(QWidget):
 
         layout.addStretch()
 
-        self.title = QLabel("Organising Your Photos")
-        # ... set font, alignment, etc. ...
+        self.title = QLabel("Organising...")
+        self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title.setStyleSheet("font-size: 24px; font-weight: bold;")
         layout.addWidget(self.title)
 
         self.status_label = QLabel("Processing...")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setStyleSheet("font-size: 14px; color: gray;")
         layout.addWidget(self.status_label)
 
         self.progress_bar = QProgressBar()
@@ -32,6 +36,7 @@ class ProgressView(QWidget):
         layout.addStretch()
 
         self.warning = QLabel("Please don't close the application while organising")
+        self.warning.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.warning)
 
     def set_progress(self, value, maximum):

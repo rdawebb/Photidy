@@ -13,4 +13,4 @@ SHORTCUT_SETTINGS = "Ctrl+,"
 
 # About dialog
 ABOUT_ICON_PATH = "src/ui/assets/placeholder.png"
-ABOUT_COPYRIGHT = "&copy; 2025 Rob Webb"
+ABOUT_COPYRIGHT = "&copy; 2026 Rob Webb"

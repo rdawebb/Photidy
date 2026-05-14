@@ -2,6 +2,7 @@
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -27,6 +28,7 @@ class SetupView(QWidget):
 
         # Source directory selection
         source_label = QLabel("Source Directory:")
+        source_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         layout.addWidget(source_label)
         source_group = QGroupBox()
         source_layout = QVBoxLayout(source_group)
@@ -36,17 +38,19 @@ class SetupView(QWidget):
         self.folder_selector = FolderSelector()
         self.folder_selector.folderSelected.connect(self.on_folder_selected)
         self.folder_selector.line_edit.textChanged.connect(self.on_folder_text_changed)
-        self.folder_selector.setToolTip(
-            "Select the folder containing photos to organise"
-        )
+        self.folder_selector.setToolTip("Select the folder to scan for photos")
         self.folder_selector.setProperty("accessibleName", "Source Folder Selector")
         dir_layout.addWidget(self.folder_selector)
-
         source_layout.addLayout(dir_layout)
 
-        help_text = QLabel(
-            "Select the folder containing photos you want to organise (subfolders will be scanned automatically)"
+        self.subfolder_checkbox = QCheckBox("Include subfolders")
+        self.subfolder_checkbox.setToolTip(
+            "Include photos in all subfolders of the selected folder"
         )
+        self.subfolder_checkbox.setChecked(True)
+        source_layout.addWidget(self.subfolder_checkbox)
+
+        help_text = QLabel("Select the folder to scan for photos")
         help_text.setStyleSheet("color: gray; font-size: 11px;")
         help_text.setWordWrap(True)
         source_layout.addWidget(help_text)
@@ -57,8 +61,10 @@ class SetupView(QWidget):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.scan_btn = CustomButton("Scan Directory")
+        self.scan_btn = CustomButton(text="Scan Directory")
         self.scan_btn.setMinimumSize(180, 44)
+        self.scan_btn.setProperty("accessibleName", "Scan Directory Button")
+        self.scan_btn.setToolTip("Start scanning the selected folder for photos")
         self.scan_btn.setEnabled(False)
         self.scan_btn.clicked.connect(self.on_scan_clicked)
         button_layout.addWidget(self.scan_btn)
@@ -93,6 +99,6 @@ class SetupView(QWidget):
 
     def on_scan_clicked(self):
         """Handle the scan button click"""
-        source_dir = self.folder_selector.get_selected_folder()
+        source_dir: str = self.folder_selector.get_selected_folder()
         if source_dir:
             self.scan_requested.emit(source_dir)
