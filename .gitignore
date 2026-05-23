@@ -209,6 +209,9 @@ __marimo__/
 # MacOS
 .DS_Store
 
+# Dev
+dev/
+
 # Data sources
 scripts/data/
 

@@ -156,7 +156,7 @@ def scan_directory(source_dir: str, progress_callback=None) -> dict:
         "total_files": len(image_files) + other_count + inaccessible_count,
         "image_files": image_files,
         "inaccessible_count": inaccessible_count,
-        "estimated_time": estimated_time,
+        "estimated_time": f"{estimated_time} s",
     }
 
 
@@ -205,7 +205,7 @@ def organise_photos(
     failed: list[tuple[str, str]] = []
 
     for file_path in files_to_process:
-        if not (file_path.is_file() and file_path.suffix.lower() in SUPPORTED_FORMATS):
+        if not file_path.is_file():
             continue
 
         if file_path.name in state and state[file_path.name] == "processed":
@@ -284,6 +284,13 @@ def organise_photos(
             state[file_path.name] = "failed"
             _save_state(state, state_file_path=state_file)
 
+    try:
+        staging_dir.rmdir()
+        logger.info(msg=f"Staging directory removed: {staging_dir}")
+    except OSError as e:
+        logger.error(msg=f"Failed to remove staging directory: {e}")
+        pass
+
     summary: dict[str, int | list[tuple[str, str]]] = {
         "processed": processed,
         "failed": failed,
@@ -338,7 +345,7 @@ def undo_organisation(undo_log_path: Optional[Path] = None) -> bool:
         return False
 
     try:
-        with open(file=undo_log) as f:
+        with open(file=undo_log_path) as f:
             moves: list[list[str]] = [
                 line.strip().split(sep=",", maxsplit=1) for line in f if "," in line
             ]

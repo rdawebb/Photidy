@@ -13,7 +13,7 @@ from ..utils import display_scan_results, save_last_scan, validate_and_expand_pa
 console = Console()
 
 
-def scan_cmd(directory: str) -> None:
+def scan_cmd(directory: str) -> list:
     """Scan a directory for photos, display the results, and save to a cache file.
 
     Args:
@@ -46,6 +46,8 @@ def scan_cmd(directory: str) -> None:
             )
 
         save_last_scan(directory, image_files)
+
+        return image_files
 
     except InvalidDirectoryError as e:
         console.print(f"\n[red]Directory error: [/red] {e}\n")

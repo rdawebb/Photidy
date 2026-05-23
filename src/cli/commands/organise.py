@@ -46,9 +46,6 @@ def organise_cmd(
         source = console.input("\n[cyan]Enter source directory: [/cyan]")
 
     source_path = validate_and_expand_path(source)
-    if source_path is None:
-        console.print("\n[red]Error: [/red] Invalid source directory\n")
-        raise typer.Exit(code=1)
     source = str(source_path)
 
     if not image_files:
@@ -61,9 +58,6 @@ def organise_cmd(
 
     output = output or console.input("\n[cyan]Enter output directory: [/cyan]")
     output_path = validate_and_expand_path(output)
-    if output_path is None:
-        console.print("\n[red]Error: [/red] Invalid output directory\n")
-        raise typer.Exit(code=1)
     output = str(output_path)
 
     try:
