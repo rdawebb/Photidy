@@ -43,19 +43,20 @@ class OrganiserThread(QThread):
 
     def run(self):
         # Simulate organising - replace with actual implementation
-        import time
+        from src.core.organiser import organise_photos
 
-        results: dict[str, int | list[str]] = {
-            "organised": 0,
-            "skipped": 0,
-            "errors": [],
-        }
+        source_dir = self.options.get("source_dir", "")
+        output_dir = str(self.output_dir)
+        total = len(self.file_paths)
 
-        # Your actual organisation logic here
-        total: int = len(self.file_paths) if self.file_paths else 847
-        for i in range(total):
-            time.sleep(0.01)
-            self.progress.emit(i + 1, total, f"photo_{i}.jpg")
-            results["organised"] = i + 1
+        def progress_callback(current: int, filename: str):
+            self.progress.emit(current, total, filename)
 
+        results = organise_photos(
+            source_dir=source_dir,
+            dest_dir=output_dir,
+            image_files=self.file_paths,
+            progress_callback=progress_callback,
+        )
+        results["output_dir"] = output_dir
         self.finished.emit(results)

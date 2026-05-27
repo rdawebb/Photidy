@@ -18,16 +18,12 @@ pub fn read_db_version(conn: &Connection) -> Result<String, PhotoMetaError> {
 }
 
 fn get_major_minor(version: &str) -> &str {
-    let parts: Vec<&str> = version.split('.').collect();
-    if parts.len() >= 2 {
-        let major_minor = format!("{}.{}", parts[0], parts[1]);
-        if version.starts_with(&major_minor) {
-            &version[..major_minor.len()]
-        } else {
-            version
-        }
-    } else {
-        version
+    let mut parts = version.splitn(3, '.');
+    let major = parts.next().unwrap_or(version);
+    let minor = parts.next();
+    match minor {
+        Some(m) => &version[..major.len() + 1 + m.len()],
+        None => version,
     }
 }
 

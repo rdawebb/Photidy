@@ -1,6 +1,6 @@
 use pyo3::pyclass;
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Debug, Clone)]
 pub struct ExtractedMetadata {
     #[pyo3(get)]
@@ -22,7 +22,7 @@ pub struct Candidate {
     pub importance: f64,
 }
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Debug, Clone)]
 pub struct Place {
     #[pyo3(get)]

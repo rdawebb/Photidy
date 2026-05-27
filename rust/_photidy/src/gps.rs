@@ -1,4 +1,4 @@
-use exif::{Exif, Tag, In};
+use exif::{Exif, In, Tag};
 
 pub fn extract_gps(exif: &Exif) -> Option<(f64, f64)> {
     let lat = extract_coord(exif, Tag::GPSLatitude, Tag::GPSLatitudeRef)?;
@@ -36,11 +36,20 @@ fn dms_to_decimal(values: &[exif::Rational]) -> Option<f64> {
             let minutes = rational(values[1])?;
             let seconds = rational(values[2])?;
 
-            if !(0.0..=90.0).contains(&degrees) || !(0.0..60.0).contains(&minutes) || !(0.0..60.0).contains(&seconds) {
+            if !(0.0..=180.0).contains(&degrees)
+                || !(0.0..60.0).contains(&minutes)
+                || !(0.0..60.0).contains(&seconds)
+            {
                 return None;
             }
 
-            Some(degrees + (minutes / 60.0) + (seconds / 3600.0))
+            let decimal = degrees + (minutes / 60.0) + (seconds / 3600.0);
+            // Reject assembled values that exceed the absolute maximum for any axis
+            if decimal > 180.0 {
+                None
+            } else {
+                Some(decimal)
+            }
         }
         1 => rational(values[0]),
         _ => None,
@@ -86,9 +95,7 @@ mod tests {
 
     #[test]
     fn test_dms_to_decimal_single_value() {
-        let values = vec![
-            exif::Rational { num: 40, denom: 1 },
-        ];
+        let values = vec![exif::Rational { num: 40, denom: 1 }];
         let result = dms_to_decimal(&values);
         assert_eq!(result, Some(40.0));
     }
@@ -96,7 +103,7 @@ mod tests {
     #[test]
     fn test_dms_to_decimal_invalid_degrees() {
         let values = vec![
-            exif::Rational { num: 91, denom: 1 },
+            exif::Rational { num: 181, denom: 1 },
             exif::Rational { num: 0, denom: 1 },
             exif::Rational { num: 0, denom: 1 },
         ];
@@ -147,14 +154,17 @@ mod tests {
     fn test_dms_to_decimal_maximum_valid_values() {
         // Checking values at usual precision limits (7 decimal places)
         let values = vec![
-            exif::Rational { num: 90, denom: 1 },
-            exif::Rational { num: 599999999, denom: 10000000 },
-            exif::Rational { num: 599999999, denom: 10000000 },
+            exif::Rational { num: 89, denom: 1 },
+            exif::Rational { num: 59, denom: 1 },
+            exif::Rational {
+                num: 599999999,
+                denom: 10000000,
+            },
         ];
         let result = dms_to_decimal(&values);
         assert!(result.is_some());
         let coord = result.unwrap();
-        assert!((coord - 91.01666666497167).abs() < 0.0001);
+        assert!((coord - 89.99999999997222).abs() < 0.0001);
     }
 
     #[test]
@@ -162,7 +172,10 @@ mod tests {
         let values = vec![
             exif::Rational { num: 40, denom: 1 },
             exif::Rational { num: 26, denom: 1 },
-            exif::Rational { num: 465, denom: 10 }, // 46.5 seconds
+            exif::Rational {
+                num: 465,
+                denom: 10,
+            }, // 46.5 seconds
         ];
         let result = dms_to_decimal(&values);
         assert!(result.is_some());
@@ -172,7 +185,10 @@ mod tests {
 
     #[test]
     fn test_rational_large_values() {
-        let r = exif::Rational { num: 1000000, denom: 1000000 };
+        let r = exif::Rational {
+            num: 1000000,
+            denom: 1000000,
+        };
         assert_eq!(rational(r), Some(1.0));
     }
 
@@ -198,7 +214,10 @@ mod tests {
         // Checking minutes at usual precision (7 decimal places)
         let values = vec![
             exif::Rational { num: 40, denom: 1 },
-            exif::Rational { num: 599999999, denom: 10000000 },
+            exif::Rational {
+                num: 599999999,
+                denom: 10000000,
+            },
             exif::Rational { num: 0, denom: 1 },
         ];
         let result = dms_to_decimal(&values);
@@ -213,7 +232,10 @@ mod tests {
         let values = vec![
             exif::Rational { num: 40, denom: 1 },
             exif::Rational { num: 30, denom: 1 },
-            exif::Rational { num: 599999999, denom: 10000000 },
+            exif::Rational {
+                num: 599999999,
+                denom: 10000000,
+            },
         ];
         let result = dms_to_decimal(&values);
         assert!(result.is_some());

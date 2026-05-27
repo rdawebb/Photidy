@@ -55,13 +55,18 @@ def _save_state(state: dict, state_file_path: Optional[Path] = None) -> None:
         state_file_path (Path | None): Path to state file. If None, uses default
     """
     if state_file_path is None:
-        state_file_path: Path = state_file
+        state_file_path = state_file
+
+    tmp_path = state_file_path.with_suffix(".tmp")
 
     try:
-        with open(file=state_file_path, mode="w") as f:
-            json.dump(obj=state, fp=f)
+        with open(tmp_path, "w") as f:
+            json.dump(state, f)
+        os.replace(tmp_path, state_file_path)  # atomic on POSIX and Windows
+
     except (OSError, TypeError) as e:
-        logger.error(msg=f"Failed to save state to {state_file_path}: {e}")
+        logger.error(f"Failed to save state: {e}")
+        tmp_path.unlink(missing_ok=True)
 
 
 def _log_move(src: Path, dest: Path, undo_log_path: Optional[Path] = None) -> None:
@@ -166,6 +171,7 @@ def organise_photos(
     state_file: Optional[Path] = None,
     undo_log: Optional[Path] = None,
     image_files: list[Path] | None = None,
+    progress_callback=None,
 ) -> dict:
     """Organise photos from source directory to destination directory based on metadata
 
@@ -259,6 +265,9 @@ def organise_photos(
                 state[file_path.name] = "processed"
                 _save_state(state, state_file_path=state_file)
                 processed += 1
+                if progress_callback:
+                    progress_callback(processed, file_path.name)
+
             except Exception as e:
                 logger.error(
                     msg=f"Failed to move {file_path.name} from staging to final: {e}"
