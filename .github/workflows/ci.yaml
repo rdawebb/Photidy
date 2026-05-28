@@ -15,8 +15,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-22.04, ubuntu-slim, macos-latest, macos-15-intel, macos-14, windows-latest, windows-2022]
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        os:
+          - ubuntu-latest
+          - ubuntu-22.04
+          - ubuntu-slim
+          - macos-latest
+          - macos-15-intel
+          - macos-14
+          - windows-latest
+          - windows-2022
+
+        python-version:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.14"
 
     steps:
       - name: Checkout
@@ -30,6 +43,9 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Set up CMake
+        uses: jwlawson/actions-setup-cmake@v2
+
       - name: Install uv
         uses: astral-sh/setup-uv@v3
 
@@ -37,7 +53,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y sqlite3 libsqlite3-dev
+          sudo apt-get install -y \
+            build-essential \
+            libsqlite3-dev \
+            pkg-config \
+            sqlite3
 
       - name: Install Python deps
         run: |

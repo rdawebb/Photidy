@@ -16,13 +16,16 @@ from src.utils.errors import (
     PhotoOrganisationError,
 )
 from src.utils.logger import get_logger
-from src.utils.paths import state_file, undo_log
+from src.utils.paths import STATE_FILE, UNDO_LOG
 
 from .metadata import get_image_info
 
 logger: Logger = get_logger(name=__name__)
 
 STAGING_DIR = ".staging"
+
+state_file: Path = STATE_FILE
+undo_log: Path = UNDO_LOG
 
 
 def _load_state(state_file_path: Optional[Path] = None) -> dict:

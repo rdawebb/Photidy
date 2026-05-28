@@ -8,7 +8,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from src.utils.paths import scan_cache
+from src.utils.paths import SCAN_CACHE
 
 console = Console()
 
@@ -71,7 +71,7 @@ def save_last_scan(directory: str, image_files: list) -> None:
     """
     try:
         path_strings: list[str] = [str(object=p) for p in image_files]
-        with open(file=scan_cache, mode="w") as f:
+        with open(file=SCAN_CACHE, mode="w") as f:
             json.dump(obj={"directory": directory, "image_files": path_strings}, fp=f)
     except Exception as e:
         console.print(f"\n[red]Error saving scan results: [/red] {e}")
@@ -84,7 +84,7 @@ def load_last_scan() -> dict:
         dict: The last scan results, including the directory and photo files.
     """
     try:
-        with open(file=scan_cache, mode="r") as f:
+        with open(file=SCAN_CACHE, mode="r") as f:
             data: dict = json.load(fp=f)
         data["image_files"] = [Path(p) for p in data.get("image_files", [])]
         return data

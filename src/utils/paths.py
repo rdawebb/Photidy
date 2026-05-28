@@ -4,10 +4,12 @@ from pathlib import Path
 
 from appdirs import user_data_dir
 
-app_name = "Photidy"
-app_data_dir: Path = user_data_dir(appname=app_name)
-Path(app_data_dir).mkdir(parents=True, exist_ok=True)
+APP_NAME = "Photidy"
+APP_DATA_DIR: Path = user_data_dir(appname=APP_NAME)
+Path(APP_DATA_DIR).mkdir(parents=True, exist_ok=True)
 
-state_file: Path = Path(app_data_dir) / "organiser_state.json"
-undo_log: Path = Path(app_data_dir) / "organiser_undo.log"
-scan_cache: Path = Path(app_data_dir) / "scan_cache.json"
+STATE_FILE: Path = Path(APP_DATA_DIR) / "organiser_state.json"
+UNDO_LOG: Path = Path(APP_DATA_DIR) / "organiser_undo.log"
+SCAN_CACHE: Path = Path(APP_DATA_DIR) / "scan_cache.json"
+
+LOG_DIR: Path = Path(APP_DATA_DIR) / "logs"

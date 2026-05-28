@@ -1,7 +1,8 @@
+use ahash::AHashMap;
 use flate2::read::MultiGzDecoder;
 use memchr::memmem;
 use rusqlite::{params, Connection};
-use sonic_rs::{JsonContainerTrait, JsonValueTrait, Value};
+use serde::Deserialize;
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc;
 use std::thread;
@@ -17,6 +18,40 @@ struct ParsedEntity {
     geonames_id: i64,
     score: f64,
     wiki_titles: Vec<(String, String)>,
+}
+
+// Strict structs so Serde ignores unused fields
+#[derive(Deserialize)]
+struct WikidataEntity {
+    claims: Claims,
+    #[serde(default)]
+    sitelinks: AHashMap<String, Sitelink>,
+}
+
+#[derive(Deserialize)]
+struct Claims {
+    #[serde(rename = "P1566")]
+    p1566: Option<Vec<Claim>>,
+}
+
+#[derive(Deserialize)]
+struct Claim {
+    mainsnak: MainSnak,
+}
+
+#[derive(Deserialize)]
+struct MainSnak {
+    datavalue: Option<DataValue>,
+}
+
+#[derive(Deserialize)]
+struct DataValue {
+    value: String,
+}
+
+#[derive(Deserialize)]
+struct Sitelink {
+    title: String,
 }
 
 pub fn run(
@@ -116,34 +151,36 @@ pub fn run(
                 continue;
             }
 
-            let Ok(entity): Result<Value, _> = sonic_rs::from_str::<Value>(trimmed) else {
+            let Ok(entity) = sonic_rs::from_str::<WikidataEntity>(trimmed) else {
                 continue;
             };
 
             // Extract P1566 (GeoNames ID)
-            let Some(raw_id) = entity["claims"]["P1566"]
-                .get(0)
-                .and_then(|c| c["mainsnak"]["datavalue"]["value"].as_str())
-            else {
+            let Some(p1566_claims) = entity.claims.p1566 else {
+                continue;
+            };
+            let Some(first_claim) = p1566_claims.first() else {
+                continue;
+            };
+            let Some(datavalue) = &first_claim.mainsnak.datavalue else {
                 continue;
             };
 
-            let Ok(geonames_id) = raw_id.parse::<i64>() else {
+            let Ok(geonames_id) = datavalue.value.parse::<i64>() else {
                 continue;
             };
 
             entities_matched += 1;
 
             // Sitelink count and enwiki title
-            let sitelinks = &entity["sitelinks"];
-            let sitelink_count = sitelinks.as_object().map(|o| o.len()).unwrap_or(0);
+            let sitelink_count = entity.sitelinks.len();
             let score = (sitelink_count as f64 / SITELINK_CEILING).min(1.0);
 
             let mut wiki_titles = Vec::with_capacity(target_projects.len());
 
             for proj in &target_projects {
-                if let Some(title) = sitelinks[proj]["title"].as_str() {
-                    wiki_titles.push((proj.clone(), title.to_string()));
+                if let Some(sitelink) = entity.sitelinks.get(proj) {
+                    wiki_titles.push((proj.clone(), sitelink.title.clone()));
                 }
             }
 

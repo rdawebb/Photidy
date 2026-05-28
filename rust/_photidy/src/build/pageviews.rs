@@ -59,7 +59,7 @@ pub fn run_month(
             4 * 1024 * 1024,
             resp.into_body().into_reader(),
         ));
-        let reader = BufReader::new(bz);
+        let mut reader = BufReader::new(bz);
 
         let mut lines_parsed = 0u64;
         let mut places_matched = 0u64;
@@ -67,29 +67,37 @@ pub fn run_month(
         // View aggregation map: title hash -> view count
         let mut views_map: AHashMap<i64, i64> = AHashMap::new();
 
-        for line in reader.lines() {
-            let line = line.map_err(PhotoMetaError::Io)?;
+        // Persistent string buffer to avoid allocations
+        let mut line = String::with_capacity(256);
+
+        while reader.read_line(&mut line).map_err(PhotoMetaError::Io)? > 0 {
             if !line.starts_with(&project_prefix) {
+                line.clear();
                 continue;
             }
 
             lines_parsed += 1;
+            let trimmed = line.trim_end(); // Strip trailing newline
 
-            let mut parts = line.splitn(4, ' ');
+            let mut parts = trimmed.splitn(4, ' ');
             let _project = parts.next();
             let Some(raw_title) = parts.next() else {
+                line.clear();
                 continue;
             };
             let Some(count_str) = parts.next() else {
+                line.clear();
                 continue;
             };
             let Ok(view_count) = count_str.parse::<i64>() else {
+                line.clear();
                 continue;
             };
 
             // Normalise title: percent-decode + underscores to spaces
             let title = _decode_title(raw_title);
             let Some(&geonames_id) = title_map.get(title.as_str()) else {
+                line.clear();
                 continue;
             };
 
@@ -97,6 +105,9 @@ pub fn run_month(
 
             // Aggregate view count for this geonames_id
             *views_map.entry(geonames_id).or_insert(0) += view_count;
+
+            // Clear line to reuse for next iteration
+            line.clear();
         }
 
         // Push aggregated view counts onto channel
