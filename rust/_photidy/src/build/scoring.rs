@@ -112,6 +112,7 @@ fn _aggregate_views(
 
     conn.execute(&sql, params.as_slice())
         .map_err(PhotoMetaError::Database)?;
+
     Ok(())
 }
 
@@ -152,4 +153,106 @@ fn _percentile_99(sorted: &[f64]) -> f64 {
     // Values arrive pre-sorted from the ORDER BY query
     let idx = (0.99 * (sorted.len() - 1) as f64) as usize;
     sorted[idx.min(sorted.len() - 1)]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    #[test]
+    fn percentile_99_single_element() {
+        assert_eq!(_percentile_99(&[42.0]), 42.0);
+    }
+
+    #[test]
+    fn percentile_99_all_same() {
+        let v = vec![5.0; 100];
+        assert_eq!(_percentile_99(&v), 5.0);
+    }
+
+    #[test]
+    fn percentile_99_clips_at_last_index() {
+        // For a 100-element vec, idx = floor(0.99 * 99) = 98 → second-to-last
+        let v: Vec<f64> = (1..=100).map(|x| x as f64).collect();
+        assert_eq!(_percentile_99(&v), 99.0);
+    }
+
+    fn setup_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE places (
+                  geonames_id INTEGER PRIMARY KEY,
+                  score_views_12m REAL,
+                  score_views_3m  REAL,
+                  score_sitelinks REAL,
+                  importance      REAL
+               );
+               CREATE TABLE pageview_monthly (
+                  geonames_id INTEGER,
+                  year_month  TEXT,
+                  view_count  INTEGER,
+                  PRIMARY KEY (geonames_id, year_month)
+               );",
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn normalise_column_caps_at_1() {
+        let conn = setup_db();
+        // Insert values where the 99th pct = 900, so 1000 should clamp to 1.0
+        for (id, v) in (1..=100).zip([900.0f64].iter().cycle()) {
+            conn.execute(
+                "INSERT INTO places (geonames_id, score_views_12m) VALUES (?1, ?2)",
+                params![id, v],
+            )
+            .unwrap();
+        }
+        conn.execute(
+            "INSERT INTO places (geonames_id, score_views_12m) VALUES (999, 1000.0)",
+            [],
+        )
+        .unwrap();
+        _normalise_column(&conn, "score_views_12m").unwrap();
+        let capped: f64 = conn
+            .query_row(
+                "SELECT score_views_12m FROM places WHERE geonames_id = 999",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(capped <= 1.0, "expected ≤ 1.0, got {capped}");
+    }
+
+    #[test]
+    fn normalise_column_skips_empty_table() {
+        let conn = setup_db();
+        // Should return Ok without panicking
+        _normalise_column(&conn, "score_views_12m").unwrap();
+    }
+
+    #[test]
+    fn run_no_pageview_data_returns_zero_scored() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("build.db").to_str().unwrap().to_string();
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE places (
+                  geonames_id INTEGER PRIMARY KEY,
+                  score_views_12m REAL, score_views_3m REAL,
+                  score_sitelinks REAL, importance REAL
+               );
+               CREATE TABLE pageview_monthly (
+                  geonames_id INTEGER, year_month TEXT, view_count INTEGER,
+                  PRIMARY KEY (geonames_id, year_month)
+               );",
+        )
+        .unwrap();
+        drop(conn);
+
+        let result = run(&db_path, 12, 3, 0.5, 0.3, 0.2).unwrap();
+        assert_eq!(result.places_scored, 0);
+    }
 }

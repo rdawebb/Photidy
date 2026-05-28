@@ -254,3 +254,84 @@ fn _flush_titles(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn setup_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE places (
+                  geonames_id INTEGER PRIMARY KEY,
+                  score_sitelinks REAL
+               );
+               CREATE TABLE wikidata_titles (
+                  geonames_id INTEGER NOT NULL,
+                  project     TEXT    NOT NULL,
+                  title       TEXT    NOT NULL,
+                  PRIMARY KEY (geonames_id, project)
+               );",
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn sitelink_score_caps_at_1() {
+        // 300 sitelinks → score = 300/300 = 1.0 exactly
+        let score = (300f64 / SITELINK_CEILING).min(1.0);
+        assert_eq!(score, 1.0);
+        // 600 sitelinks → still 1.0
+        let score_over = (600f64 / SITELINK_CEILING).min(1.0);
+        assert_eq!(score_over, 1.0);
+    }
+
+    #[test]
+    fn flush_sitelinks_updates_existing_row() {
+        let mut conn = setup_db();
+        conn.execute("INSERT INTO places (geonames_id) VALUES (1234)", [])
+            .unwrap();
+        let tx = conn.transaction().unwrap();
+        let changed = _flush_sitelinks(&tx, &[(0.75, 1234)]).unwrap();
+        tx.commit().unwrap();
+        assert_eq!(changed, 1);
+        let score: f64 = conn
+            .query_row(
+                "SELECT score_sitelinks FROM places WHERE geonames_id = 1234",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!((score - 0.75).abs() < 1e-10);
+    }
+
+    #[test]
+    fn flush_sitelinks_skips_missing_geonames_id() {
+        let mut conn = setup_db();
+        let tx = conn.transaction().unwrap();
+        let changed = _flush_sitelinks(&tx, &[(0.5, 9999)]).unwrap();
+        tx.commit().unwrap();
+        assert_eq!(changed, 0); // no matching row → 0 rows changed
+    }
+
+    #[test]
+    fn flush_titles_inserts_and_replaces() {
+        let mut conn = setup_db();
+        conn.execute("INSERT INTO places (geonames_id) VALUES (42)", [])
+            .unwrap();
+        let batch = vec![(42i64, "enwiki".to_string(), "London".to_string())];
+        let tx = conn.transaction().unwrap();
+        _flush_titles(&tx, &batch).unwrap();
+        tx.commit().unwrap();
+        let title: String = conn
+            .query_row(
+                "SELECT title FROM wikidata_titles WHERE geonames_id = 42 AND project = 'enwiki'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(title, "London");
+    }
+}

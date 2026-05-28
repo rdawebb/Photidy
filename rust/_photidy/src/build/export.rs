@@ -108,3 +108,110 @@ pub fn run(
         output_path: app_db_path.to_string(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+    use tempfile::tempdir;
+
+    // Temporary build database for testing
+    fn make_build_db(path: &str) {
+        let conn = Connection::open(path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE places (
+                  geonames_id INTEGER PRIMARY KEY,
+                  name        TEXT    NOT NULL,
+                  country     TEXT    NOT NULL,
+                  admin       TEXT,
+                  lat         REAL    NOT NULL,
+                  lon         REAL    NOT NULL,
+                  kind        TEXT    NOT NULL,
+                  importance  REAL
+               );
+               CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+               INSERT INTO meta VALUES ('version', '1');",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn export_empty_build_db_produces_empty_app_db() {
+        let dir = tempdir().unwrap();
+        let build = dir.path().join("build.db").to_str().unwrap().to_string();
+        let app = dir.path().join("app.db").to_str().unwrap().to_string();
+        make_build_db(&build);
+
+        let result = run(&build, &app, 50).unwrap();
+        assert_eq!(result.places_exported, 0);
+        assert_eq!(result.output_path, app);
+    }
+
+    #[test]
+    fn export_respects_regional_cap() {
+        let dir = tempdir().unwrap();
+        let build = dir.path().join("build.db").to_str().unwrap().to_string();
+        let app = dir.path().join("app.db").to_str().unwrap().to_string();
+        make_build_db(&build);
+
+        let conn = Connection::open(&build).unwrap();
+        // Insert 5 places in the same country/admin with varying importance
+        for i in 1..=5i64 {
+            conn.execute(
+                "INSERT INTO places (geonames_id, name, country, admin, lat, lon, kind, importance)
+                   VALUES (?1, ?2, 'US', 'CA', 0.0, 0.0, 'city', ?3)",
+                params![i, format!("Place{i}"), i as f64],
+            )
+            .unwrap();
+        }
+        drop(conn);
+
+        let result = run(&build, &app, 3).unwrap();
+        // Cap = 3 per country+admin region
+        assert_eq!(result.places_exported, 3);
+    }
+
+    #[test]
+    fn export_excludes_null_importance() {
+        let dir = tempdir().unwrap();
+        let build = dir.path().join("build.db").to_str().unwrap().to_string();
+        let app = dir.path().join("app.db").to_str().unwrap().to_string();
+        make_build_db(&build);
+
+        let conn = Connection::open(&build).unwrap();
+        conn.execute(
+            "INSERT INTO places (geonames_id, name, country, admin, lat, lon, kind, importance)
+               VALUES (1, 'Scored', 'US', NULL, 0.0, 0.0, 'city', 0.5)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO places (geonames_id, name, country, admin, lat, lon, kind, importance)
+               VALUES (2, 'Unscored', 'US', NULL, 1.0, 1.0, 'city', NULL)",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let result = run(&build, &app, 100).unwrap();
+        assert_eq!(result.places_exported, 1);
+    }
+
+    #[test]
+    fn export_copies_meta_table() {
+        let dir = tempdir().unwrap();
+        let build = dir.path().join("build.db").to_str().unwrap().to_string();
+        let app = dir.path().join("app.db").to_str().unwrap().to_string();
+        make_build_db(&build);
+
+        run(&build, &app, 50).unwrap();
+
+        let app_conn = Connection::open(&app).unwrap();
+        let version: String = app_conn
+            .query_row("SELECT value FROM meta WHERE key = 'version'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(version, "1");
+    }
+}

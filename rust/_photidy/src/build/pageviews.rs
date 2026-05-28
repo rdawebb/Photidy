@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use bzip2::read::MultiBzDecoder;
 use rusqlite::{params, Connection};
 use std::io::{BufRead, BufReader};
@@ -63,6 +64,9 @@ pub fn run_month(
         let mut lines_parsed = 0u64;
         let mut places_matched = 0u64;
 
+        // View aggregation map: title hash -> view count
+        let mut views_map: AHashMap<i64, i64> = AHashMap::new();
+
         for line in reader.lines() {
             let line = line.map_err(PhotoMetaError::Io)?;
             if !line.starts_with(&project_prefix) {
@@ -91,8 +95,13 @@ pub fn run_month(
 
             places_matched += 1;
 
-            // Push onto channel - if the receiver drops, safely break
-            if tx_chan.send((geonames_id, view_count)).is_err() {
+            // Aggregate view count for this geonames_id
+            *views_map.entry(geonames_id).or_insert(0) += view_count;
+        }
+
+        // Push aggregated view counts onto channel
+        for (geonames_id, total_views) in views_map {
+            if tx_chan.send((geonames_id, total_views)).is_err() {
                 break;
             }
         }
@@ -154,7 +163,7 @@ pub fn run_month(
 fn _load_title_map(
     conn: &Connection,
     project: &str,
-) -> Result<std::collections::HashMap<String, i64>, PhotoMetaError> {
+) -> Result<AHashMap<String, i64>, PhotoMetaError> {
     let mut stmt = conn
         .prepare("SELECT title, geonames_id FROM wikidata_titles WHERE project = ?1")
         .map_err(PhotoMetaError::Database)?;
@@ -184,10 +193,24 @@ fn _decode_title(raw: &str) -> String {
     if !raw.contains('%') && !raw.contains('_') {
         return raw.to_string();
     }
-    let decoded = percent_encoding::percent_decode_str(raw)
-        .decode_utf8_lossy()
-        .into_owned();
-    decoded.replace('_', " ")
+    let decoded_cow = percent_encoding::percent_decode_str(raw).decode_utf8_lossy();
+
+    // If there are no underscores, return the decoded string as-is
+    if !decoded_cow.contains('_') {
+        return decoded_cow.into_owned();
+    }
+
+    // Replace underscores with spaces
+    let mut final_string = String::with_capacity(decoded_cow.len());
+    for c in decoded_cow.chars() {
+        if c == '_' {
+            final_string.push(' ');
+        } else {
+            final_string.push(c);
+        }
+    }
+
+    final_string
 }
 
 fn _create_pageview_table_if_needed(build_db_path: &str) -> Result<(), PhotoMetaError> {
@@ -223,4 +246,46 @@ fn _flush_pageviews(
             .map_err(PhotoMetaError::Database)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sitelink_key_wikipedia() {
+        assert_eq!(_project_to_sitelink_key("en.wikipedia"), "enwiki");
+        assert_eq!(_project_to_sitelink_key("fr.wikipedia"), "frwiki");
+    }
+
+    #[test]
+    fn sitelink_key_non_wikipedia_passthrough() {
+        assert_eq!(_project_to_sitelink_key("en.wikivoyage"), "en.wikivoyage");
+    }
+
+    #[test]
+    fn decode_title_plain() {
+        assert_eq!(_decode_title("London"), "London");
+    }
+
+    #[test]
+    fn decode_title_underscores_to_spaces() {
+        assert_eq!(_decode_title("New_York_City"), "New York City");
+    }
+
+    #[test]
+    fn decode_title_percent_encoded() {
+        assert_eq!(_decode_title("S%C3%A3o_Paulo"), "São Paulo");
+    }
+
+    #[test]
+    fn decode_title_mixed_encoding() {
+        assert_eq!(_decode_title("Caf%C3%A9_de_Flore"), "Café de Flore");
+    }
+
+    #[test]
+    fn decode_title_no_encoding_fast_path() {
+        // Must not call percent_decode, covered implicitly by not panicking
+        assert_eq!(_decode_title("Paris"), "Paris");
+    }
 }

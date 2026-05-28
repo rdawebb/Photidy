@@ -4,11 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [Unreleased]
 
 ### Added
 
+- Database build pipeline ported to Rust, replacing Python-side scoring and filtering
+- Streaming and parseing the Wikidata JSON dump to extract GeoNames IDs and sitelink counts
+- Downloading and parsing monthly bz2 pageview dumps per place
+- Weighted importance scoring using pageviews & sitelink count, normalised to the 99th percentile
+- Build DB export step with regional pruning cap and optimised indexes for the app DB
+- geonames_id column and intermediate score columns in the build schema
+- Progress callback support in organise_photos
 - Expanded CLI with organise/undo commands.
 - New multi-view GUI using `QStackedWidget` with separate view classes
 - Background threading support for async operations
@@ -24,6 +30,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- OrganiserThread now calls the real function instead of a simulated loop
+- scoring.rs renamed to geo_scoring.rs to distinguish geocoding scoring from build-time importance scoring
+- build_rust.py now builds with --features build-db
+- Removed hardcoded importance scores and keyword filters from constants.py
+- Build and app DBs now use separate paths, build DB retains full data, app DB is pruned at export
 - Main window refactored from container-based to stacked widget
 - CLI migration from standard `typer` to `typer-extensions`
 - Improved scan command output and return value.
@@ -37,24 +48,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Standardised naming convention: photo_files → image_files across all modules
 - Replaced `Makefile` with `Justfile` for simpler task management
 - Dependency upgrades:
-    - icecream->2.2.0
-    - maturin->1.13.1
-    - prek->0.4.0
-    - pygments->2.20.0
-    - pyside->6.11.0
-    - pytest->9.0.3
-    - pytest-cov->7.1.0
-    - ruff->0.15.11
-    - rusqlite->0.38
-    - rust-just->1.50.0
-    - ty->0.0.32
+  - chrono->0.4.44
+  - icecream->2.2.0
+  - maturin->1.13.3
+  - prek->0.4.2
+  - pygments->2.20.0
+  - pyo3->0.28.3
+  - pyside->6.11.0
+  - pytest->9.0.3
+  - pytest-cov->7.1.0
+  - ruff->0.15.14
+  - rusqlite->0.40
+  - rust-just->1.51.0
+  - ty->0.0.39
 
 ### Fixed
 
 - Removed large DB file and cleaned up Rust package structure.
 - Updated metadata tests.
 - Removed hardcoded Qt plugin path detection workaround - no longer needed with PySide 6.11.
-
+- GPS coordinate degree validation widened from 90° to 180° to correctly handle longitude
+- State file saves are now atomic using a .tmp + os.replace() pattern
 
 ## [0.2.0] - 2026-01-05
 
@@ -77,7 +91,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - Various bug fixes and test improvements.
 
-
 ## [0.1.0] - 2025-11-17
 
 ### Added
@@ -88,7 +101,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Rust backend integration for metadata processing.
 - Logging, error handling, and configuration utilities.
 - Initial test suite for core modules.
-
 
 [unreleased](https://github.com/rdawebb/Photidy/compare/v0.2.0-alpha...main)
 [0.2.0](https://github.com/rdawebb/Photidy/compare/v0.1.0-alpha...v0.2.0-alpha)
