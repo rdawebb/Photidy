@@ -1,8 +1,8 @@
 use ahash::AHashMap;
 use flate2::read::MultiGzDecoder;
 use memchr::memmem;
+use percent_encoding::percent_decode_str;
 use rusqlite::{params, Connection};
-use serde::Deserialize;
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc;
 use std::thread;
@@ -20,38 +20,11 @@ struct ParsedEntity {
     wiki_titles: Vec<(String, String)>,
 }
 
-// Strict structs so Serde ignores unused fields
-#[derive(Deserialize)]
-struct WikidataEntity {
-    claims: Claims,
-    #[serde(default)]
-    sitelinks: AHashMap<String, Sitelink>,
-}
-
-#[derive(Deserialize)]
-struct Claims {
-    #[serde(rename = "P1566")]
-    p1566: Option<Vec<Claim>>,
-}
-
-#[derive(Deserialize)]
-struct Claim {
-    mainsnak: MainSnak,
-}
-
-#[derive(Deserialize)]
-struct MainSnak {
-    datavalue: Option<DataValue>,
-}
-
-#[derive(Deserialize)]
-struct DataValue {
-    value: String,
-}
-
-#[derive(Deserialize)]
-struct Sitelink {
-    title: String,
+// Per-entity state accumulator across RDF lines
+struct EntityAccumulator {
+    geonames_id: i64,
+    sitelink_count: u32,
+    wiki_titles: Vec<(String, String)>,
 }
 
 pub fn run(
@@ -76,8 +49,8 @@ pub fn run(
 
     _create_wikidata_titles_table(&conn)?;
 
-    // Convert projects to owned Strings so they can be safely moved into the background thread
-    let target_projects: Vec<String> = projects.iter().map(|p| p.to_string()).collect();
+    // Move projects into the producer thread
+    let target_projects: Vec<String> = projects;
     let source_str = source.to_string();
 
     // High channel capacity to avoid blocking if SQLite slows down
@@ -109,93 +82,127 @@ pub fn run(
 
         let gz = MultiGzDecoder::new(BufReader::with_capacity(4 * 1024 * 1024, stream));
 
-        // Wikidata dump is a JSON array — one entity per line (after first/last)
-        // Each line (trimmed of trailing comma) is a self-contained JSON object
-        let reader = std::io::BufReader::new(gz);
+        let mut reader = std::io::BufReader::with_capacity(1 << 20, gz);
 
-        let mut entities_streamed = 0u64;
+        let mut lines_parsed = 0u64;
         let mut entities_matched = 0u64;
 
-        let needle = memmem::Finder::new("\"P1566\"");
+        // RDF NT format: one triple per line, entities grouped but not contiguous
+        // Sitelinks are inverted: the Wikipedia URL is the subject, the QID is the object
+        // All P1566 entities are accumulated in a map and flushed after the loop
+        let finder_p1566 = memmem::Finder::new("/prop/direct/P1566>");
+        let finder_article = memmem::Finder::new("schema.org/Article>");
+        let finder_about = memmem::Finder::new("schema.org/about>");
 
-        for line in reader.lines() {
-            let line = line.map_err(PhotoMetaError::Io)?;
-            let trimmed = line.trim().trim_end_matches(',');
-            if trimmed == "[" || trimmed == "]" || trimmed.is_empty() {
+        // QID -> EntityAccumulator
+        let mut accum: AHashMap<i64, EntityAccumulator> = AHashMap::new();
+
+        // Buffered URL from schema:Article lines, resolved on schema:about lines
+        let mut pending_url: Option<String> = None;
+
+        let mut buf: Vec<u8> = Vec::with_capacity(256);
+        loop {
+            buf.clear();
+            let n = reader
+                .read_until(b'\n', &mut buf)
+                .map_err(PhotoMetaError::Io)?;
+            if n == 0 {
+                break;
+            }
+
+            // Trim whitespace + trailing commas on bytes
+            let mut trimmed = buf.trim_ascii();
+            while let Some(s) = trimmed.strip_suffix(b",") {
+                trimmed = s;
+            }
+            if trimmed.is_empty() {
                 continue;
             }
 
-            entities_streamed += 1;
+            lines_parsed += 1;
             // For testing: limit to max_streamed if set
-            if entities_streamed > max_streamed.unwrap_or(u64::MAX) {
+            if lines_parsed >= max_streamed.unwrap_or(u64::MAX) {
                 eprintln!(
                     "Wikidata: {:>10} streamed  {:>8} matched in {:?}",
-                    entities_streamed,
+                    lines_parsed,
                     entities_matched,
                     start_time.elapsed()
                 );
                 break;
             }
 
-            if entities_streamed % LOG_INTERVAL == 0 {
+            if lines_parsed % LOG_INTERVAL == 0 {
                 eprintln!(
                     "Wikidata: {:>10} streamed  {:>8} matched in {:?}",
-                    entities_streamed,
+                    lines_parsed,
                     entities_matched,
                     start_time.elapsed()
                 );
             }
 
-            // Skip entities that don't have a P1566 claim (GeoNames ID)
-            if needle.find(trimmed.as_bytes()).is_none() {
+            // Only lines that hit a finder get validated as UTF-8
+            if finder_article.find(trimmed).is_some() {
+                if let Ok(s) = std::str::from_utf8(trimmed) {
+                    pending_url = _extract_subject(s).map(str::to_owned);
+                }
                 continue;
             }
 
-            let Ok(entity) = sonic_rs::from_str::<WikidataEntity>(trimmed) else {
+            if finder_about.find(trimmed).is_some() {
+                if let Ok(s) = std::str::from_utf8(trimmed) {
+                    if let Some(url) = pending_url.take() {
+                        if let Some(qid) = _extract_qid_from_object(s) {
+                            if let Some(entry) = accum.get_mut(&qid) {
+                                entry.sitelink_count += 1;
+                                if let Some(project) = _url_to_project(&url) {
+                                    if target_projects.contains(&project) {
+                                        if let Some(title) = _extract_title_from_url(&url) {
+                                            entry.wiki_titles.push((project, title));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 continue;
-            };
+            }
 
-            // Extract P1566 (GeoNames ID)
-            let Some(p1566_claims) = entity.claims.p1566 else {
-                continue;
-            };
-            let Some(first_claim) = p1566_claims.first() else {
-                continue;
-            };
-            let Some(datavalue) = &first_claim.mainsnak.datavalue else {
-                continue;
-            };
+            pending_url = None;
 
-            let Ok(geonames_id) = datavalue.value.parse::<i64>() else {
-                continue;
-            };
-
-            entities_matched += 1;
-
-            // Sitelink count and enwiki title
-            let sitelink_count = entity.sitelinks.len();
-            let score = (sitelink_count as f64 / SITELINK_CEILING).min(1.0);
-
-            let mut wiki_titles = Vec::with_capacity(target_projects.len());
-
-            for proj in &target_projects {
-                if let Some(sitelink) = entity.sitelinks.get(proj) {
-                    wiki_titles.push((proj.clone(), sitelink.title.clone()));
+            if finder_p1566.find(trimmed).is_some() {
+                if let Ok(s) = std::str::from_utf8(trimmed) {
+                    if let (Some(qid), Some(geonames_id)) =
+                        (_extract_qid_from_subject(s), _extract_p1566_value(s))
+                    {
+                        // Insert only if the QID is not already present
+                        accum.entry(qid).or_insert_with(|| {
+                            entities_matched += 1;
+                            EntityAccumulator {
+                                geonames_id,
+                                sitelink_count: 0,
+                                wiki_titles: Vec::new(),
+                            }
+                        });
+                    }
                 }
             }
+        }
 
+        // Flush the accumulator to the channel
+        for (_qid, entry) in accum {
+            let score = (entry.sitelink_count as f64 / SITELINK_CEILING).min(1.0);
             let payload = ParsedEntity {
-                geonames_id,
+                geonames_id: entry.geonames_id,
                 score,
-                wiki_titles,
+                wiki_titles: entry.wiki_titles,
             };
-
             if tx_chan.send(payload).is_err() {
                 break;
             }
         }
 
-        Ok((entities_streamed, entities_matched))
+        Ok((lines_parsed, entities_matched))
     });
 
     let tx = conn.transaction().map_err(PhotoMetaError::Database)?;
@@ -233,10 +240,10 @@ pub fn run(
     tx.commit().map_err(PhotoMetaError::Database)?;
 
     // Wait for the producer to finish and get the results
-    let (entities_streamed, entities_matched) = producer.join().unwrap()?;
+    let (lines_parsed, entities_matched) = producer.join().unwrap()?;
 
     Ok(WikidataResult {
-        entities_streamed,
+        lines_parsed,
         entities_matched,
         places_updated,
         titles_mapped,
@@ -257,6 +264,65 @@ fn _create_wikidata_titles_table(conn: &Connection) -> Result<(), PhotoMetaError
     ",
     )
     .map_err(PhotoMetaError::Database)
+}
+
+// Extracts the subject line from a NT triple
+fn _extract_subject(line: &str) -> Option<&str> {
+    let start = line.find('<')? + 1;
+    let end = line[start..].find('>')? + start;
+    Some(&line[start..end])
+}
+
+// Extracts the QID from the object position of a triple whose subject is a Wikipedia URL
+fn _extract_qid_from_object(line: &str) -> Option<i64> {
+    let mut iter = line.splitn(4, '>');
+    iter.next()?;
+    iter.next()?;
+    let third = iter.next()?;
+    let q_pos = third.rfind("/Q")? + 2;
+    third[q_pos..].parse::<i64>().ok()
+}
+
+// Extracts the QID from the subject position of a P1566 triple
+fn _extract_qid_from_subject(line: &str) -> Option<i64> {
+    let start = line.find("/Q")? + 2;
+    let end = line[start..].find('>')? + start;
+    line[start..end].parse::<i64>().ok()
+}
+
+// Extracts the GeoNames ID from the P1566 triple
+fn _extract_p1566_value(line: &str) -> Option<i64> {
+    let start = line.find('"')? + 1;
+    let end = line[start..].find('"')? + start;
+    line[start..end].parse::<i64>().ok()
+}
+
+// Converts a Wikipedia/Wikimedia URL host into the project key used by the target_projects
+fn _url_to_project(url: &str) -> Option<String> {
+    let host_and_path = url.strip_prefix("https://")?;
+    let slash = host_and_path.find('/')?;
+    let host = &host_and_path[..slash];
+
+    let mut parts = host.splitn(3, '.');
+    let lang = parts.next()?;
+    let site = parts.next()?;
+
+    let project = match site {
+        "wikipedia" => format!("{}wiki", lang),
+        "wikimedia" => format!("{}wiki", lang),
+        other => format!("{}{}", lang, other),
+    };
+
+    Some(project)
+}
+
+// Extracts and percent-decodes the title from the URL
+fn _extract_title_from_url(url: &str) -> Option<String> {
+    let marker = "/wiki/";
+    let start = url.find(marker)? + marker.len();
+    let encoded = &url[start..];
+    let decoded = percent_decode_str(encoded).decode_utf8().ok()?.into_owned();
+    Some(decoded)
 }
 
 fn _flush_sitelinks(
@@ -313,6 +379,86 @@ mod tests {
         )
         .unwrap();
         conn
+    }
+
+    #[test]
+    fn extract_subject_wikipedia_url() {
+        let line = "<https://en.wikipedia.org/wiki/Belgium> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Article> .";
+        assert_eq!(
+            _extract_subject(line),
+            Some("https://en.wikipedia.org/wiki/Belgium")
+        );
+    }
+
+    #[test]
+    fn extract_qid_from_object_q31() {
+        let line = "<https://en.wikipedia.org/wiki/Belgium> <http://schema.org/about> <http://www.wikidata.org/entity/Q31> .";
+        assert_eq!(_extract_qid_from_object(line), Some(31));
+    }
+
+    #[test]
+    fn extract_qid_from_subject_p1566_line() {
+        let line = "<http://www.wikidata.org/entity/Q31> <http://www.wikidata.org/prop/direct/P1566> \"2802361\" .";
+        assert_eq!(_extract_qid_from_subject(line), Some(31));
+    }
+
+    #[test]
+    fn extract_p1566_value_parses_geonames_id() {
+        let line = "<http://www.wikidata.org/entity/Q31> <http://www.wikidata.org/prop/direct/P1566> \"2802361\" .";
+        assert_eq!(_extract_p1566_value(line), Some(2802361));
+    }
+
+    #[test]
+    fn url_to_project_wikipedia() {
+        assert_eq!(
+            _url_to_project("https://en.wikipedia.org/wiki/Belgium"),
+            Some("enwiki".to_string())
+        );
+        assert_eq!(
+            _url_to_project("https://fr.wikipedia.org/wiki/Belgique"),
+            Some("frwiki".to_string())
+        );
+    }
+
+    #[test]
+    fn url_to_project_wikivoyage() {
+        assert_eq!(
+            _url_to_project("https://en.wikivoyage.org/wiki/Belgium"),
+            Some("enwikivoyage".to_string())
+        );
+    }
+
+    #[test]
+    fn url_to_project_commons() {
+        assert_eq!(
+            _url_to_project("https://commons.wikimedia.org/wiki/File:Flag.svg"),
+            Some("commonswiki".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_title_plain_ascii() {
+        assert_eq!(
+            _extract_title_from_url("https://en.wikipedia.org/wiki/Belgium"),
+            Some("Belgium".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_title_percent_encoded() {
+        assert_eq!(
+            _extract_title_from_url("https://fr.wikipedia.org/wiki/Ren%C3%A9_Magritte"),
+            Some("René_Magritte".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_title_multibyte_encoded() {
+        // zh.wikivoyage Belgium
+        assert_eq!(
+            _extract_title_from_url("https://zh.wikivoyage.org/wiki/%E6%AF%94%E5%88%A9%E6%97%B6"),
+            Some("比利时".to_string())
+        );
     }
 
     #[test]

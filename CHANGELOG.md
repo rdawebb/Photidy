@@ -10,9 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - Database build pipeline ported to Rust, replacing Python-side scoring and filtering.
 - Unit tests for export.rs, scoring.rs, and wikidata.rs build pipeline modules.
-- Streaming and parsing the Wikidata JSON dump to extract GeoNames IDs and sitelink counts.
-- Typed Serde structs for safer field access.
-- Downloading and parsing monthly bz2 pageview dumps per place.
+- Streaming and parsing the Wikidata NT dump to extract GeoNames IDs and sitelink counts.
+- NT triple parsing helpers for extracting properties from Wikidata dump lines.
+- Concurrent async streaming and parsing of multiple monthly bz2 pageview dumps.
 - Reusable String buffer via read_line to reduce per-line allocations.
 - Weighted importance scoring using pageviews & sitelink count, normalised to the 99th percentile.
 - Build DB export step with regional pruning cap and optimised indexes for the app DB.
@@ -54,6 +54,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Standardised naming convention: photo_files → image_files across all modules.
 - Replaced `Makefile` with `Justfile` for simpler task management.
 - CI Linux step expanded to install build-essential and pkg-config for zlib-ng-compat build support.
+- CI: pinned astral-sh/setup-uv to a commit SHA; bumped actions/checkout and setup-python to v6.
+- Rust tests now run with --features build-db to cover build pipeline modules.
 - Dependency upgrades:
   - chrono->0.4.44
   - icecream->2.2.0

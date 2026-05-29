@@ -9,7 +9,18 @@ crate-type = ["cdylib"]
 
 [features]
 default = []
-build-db = ["ahash", "bzip2", "flate2", "memchr", "rayon", "sonic-rs", "ureq"]
+build-db = [
+    "ahash",
+    "async-compression",
+    "flate2",
+    "futures",
+    "memchr",
+    "rayon",
+    "reqwest",
+    "tokio",
+    "tokio-util",
+    "ureq",
+]
 
 [dependencies]
 pyo3 = { version = "0.28.3", features = ["extension-module"] }
@@ -25,14 +36,19 @@ version  = "0.8.12"
 features = ["serde"]
 optional = true
 
-[dependencies.bzip2]
-version  = "0.6.1"
+[dependencies.async-compression]
+version  = "0.4"
+features = ["bzip2", "tokio"]
 optional = true
 
 [dependencies.flate2]
 version  = "1.1.9"
 features = ["zlib-ng-compat"]
 default-features = false
+optional = true
+
+[dependencies.futures]
+version  = "0.3"
 optional = true
 
 [dependencies.memchr]
@@ -43,8 +59,19 @@ optional = true
 version  = "1.12.0"
 optional = true
 
-[dependencies.sonic-rs]
-version  = "0.5.8"
+[dependencies.reqwest]
+version  = "0.12"
+features = ["stream"]
+optional = true
+
+[dependencies.tokio]
+version  = "1"
+features = ["macros", "rt-multi-thread", "sync"]
+optional = true
+
+[dependencies.tokio-util]
+version  = "0.7"
+features = ["io"]
 optional = true
 
 [dependencies.ureq]

@@ -12,7 +12,7 @@ use crate::errors::PhotoMetaError;
 #[pyclass]
 pub struct WikidataResult {
     #[pyo3(get)]
-    pub entities_streamed: u64,
+    pub lines_parsed: u64,
     #[pyo3(get)]
     pub entities_matched: u64,
     #[pyo3(get)]
@@ -64,12 +64,17 @@ pub fn build_wikidata_enrichment(
 /// Deletes the dump file after parsing.
 /// Returns counts for logging.
 #[pyfunction]
-pub fn build_pageview_month(
+pub fn build_pageview_months(
     build_db_path: &str,
-    year_month: &str, // "2026-04"
-    project: &str,    // "en.wikipedia"
-) -> Result<PageviewResult, PhotoMetaError> {
-    pageviews::run_month(build_db_path, year_month, project)
+    year_months: Vec<String>, // ["2026-04", "2026-03", ...]
+    project: &str,
+) -> Result<Vec<PageviewResult>, PhotoMetaError> {
+    let refs: Vec<&str> = year_months.iter().map(String::as_str).collect();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(PhotoMetaError::Io)?;
+    rt.block_on(pageviews::run_months(build_db_path, &refs, project))
 }
 
 /// Aggregate pageview_monthly raw counts into normalised scores and

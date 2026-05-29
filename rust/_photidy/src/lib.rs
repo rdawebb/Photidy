@@ -36,7 +36,7 @@ fn _photidy(m: &Bound<PyModule>) -> PyResult<()> {
     #[cfg(feature = "build-db")]
     {
         m.add_function(wrap_pyfunction!(build::build_wikidata_enrichment, m)?)?;
-        m.add_function(wrap_pyfunction!(build::build_pageview_month, m)?)?;
+        m.add_function(wrap_pyfunction!(build::build_pageview_months, m)?)?;
         m.add_function(wrap_pyfunction!(build::build_compute_scores, m)?)?;
         m.add_function(wrap_pyfunction!(build::build_export_app_db, m)?)?;
     }
